@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../constants/colors.dart';
+import '/constants/colors.dart';
 
 class C07EmergencyActive extends StatefulWidget {
   const C07EmergencyActive({super.key});

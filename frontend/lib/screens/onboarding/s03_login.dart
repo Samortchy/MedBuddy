@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../constants/colors.dart';
-import '../../constants/dimens.dart';
-import '../../constants/text_styles.dart';
+import '/constants/colors.dart';
+import '/constants/dimens.dart';
+import '/constants/text_styles.dart';
 import 's04_basic_info.dart';
 
 class S03Login extends StatefulWidget {

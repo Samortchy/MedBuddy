@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../constants/colors.dart';
+import '/constants/colors.dart';
 
 class C06PatientHistory extends StatefulWidget {
   const C06PatientHistory({super.key});

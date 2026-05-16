@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../constants/colors.dart';
+import '/constants/colors.dart';
 import 'c05_patient_medications.dart';
 import 'c06_patient_history.dart';
 import 'c07_emergency_active.dart';

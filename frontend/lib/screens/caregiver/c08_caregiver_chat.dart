@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../constants/colors.dart';
+import '/constants/colors.dart';
 
 class C08CaregiverChat extends StatefulWidget {
   const C08CaregiverChat({super.key});

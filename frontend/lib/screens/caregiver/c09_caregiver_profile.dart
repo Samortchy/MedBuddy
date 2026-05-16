@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../constants/colors.dart';
+import '/constants/colors.dart';
 import 'c02_add_patient.dart';
 
 class C09CaregiverProfile extends StatelessWidget {

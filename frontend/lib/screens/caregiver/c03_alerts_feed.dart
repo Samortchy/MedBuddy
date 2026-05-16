@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../constants/colors.dart';
+import '/constants/colors.dart';
 
 class C03AlertsFeed extends StatefulWidget {
   const C03AlertsFeed({super.key});

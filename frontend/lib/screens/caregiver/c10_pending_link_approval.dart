@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../constants/colors.dart';
+import '/constants/colors.dart';
 
 class C10PendingLinkApproval extends StatelessWidget {
   const C10PendingLinkApproval({super.key});

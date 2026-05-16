@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../constants/colors.dart';
-import '../../constants/dimens.dart';
-import '../../constants/text_styles.dart';
+import '/constants/colors.dart';
+import '/constants/dimens.dart';
+import '/constants/text_styles.dart';
 import 's02_role_selection.dart';
 
 class S01Welcome extends StatefulWidget {

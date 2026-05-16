@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../constants/colors.dart';
-import '../../constants/dimens.dart';
-import '../../constants/text_styles.dart';
+import '/constants/colors.dart';
+import '/constants/dimens.dart';
+import '/constants/text_styles.dart';
 
 class S10Review extends StatelessWidget {
   const S10Review({super.key});

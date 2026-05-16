@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../constants/colors.dart';
+import '/constants/colors.dart';
 import 'c09_caregiver_profile.dart';
 
 class C11Settings extends StatefulWidget {

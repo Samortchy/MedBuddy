@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../constants/colors.dart';
+import '/constants/colors.dart';
 import 'c04_patient_dashboard.dart';
 import 'c02_add_patient.dart';
 import 'c10_pending_link_approval.dart';
