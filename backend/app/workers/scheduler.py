@@ -6,6 +6,8 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI
 
+from app.workers.checkin_worker import trigger_daily_checkins
+from app.workers.escalation_worker import escalate_missed_doses
 from app.workers.reminder_worker import (
     appointment_reminder_job,
     medication_reminder_job,
@@ -36,6 +38,22 @@ def _register_jobs() -> None:
         trigger=IntervalTrigger(minutes=30),
         id="appointment_reminder_interval",
         misfire_grace_time=60,
+        replace_existing=True,
+    )
+    # Task #24 — Daily wellness check-in trigger (every 60 seconds)
+    scheduler.add_job(
+        trigger_daily_checkins,
+        trigger=IntervalTrigger(seconds=60),
+        id="daily_checkin_trigger",
+        misfire_grace_time=30,
+        replace_existing=True,
+    )
+    # Task #26 — Missed-dose escalation (every 30 minutes)
+    scheduler.add_job(
+        escalate_missed_doses,
+        trigger=IntervalTrigger(minutes=30),
+        id="missed_dose_escalation",
+        misfire_grace_time=120,
         replace_existing=True,
     )
     logger.info("Scheduler jobs registered: %s", [j.id for j in scheduler.get_jobs()])
