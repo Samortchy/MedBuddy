@@ -39,8 +39,8 @@ async def get_current_user(db: Client = Depends(get_db)) -> dict:
 
     # ── PLACEHOLDER — hardcoded for local development only ──────────────────
     # Replace these UUIDs with real ones from your Supabase database for testing
-    PLACEHOLDER_PROFILE_ID = "00000000-0000-0000-0000-000000000001"
-    PLACEHOLDER_PATIENT_PROFILE_ID = "00000000-0000-0000-0000-000000000002"
+    PLACEHOLDER_PROFILE_ID = "77eb9011-45e4-4b4c-b064-6d49956c86e5"
+    PLACEHOLDER_PATIENT_PROFILE_ID = "7edb44fd-cc05-4880-a7a8-965fa8dc8435"
 
     return {
         "profile_id": PLACEHOLDER_PROFILE_ID,
