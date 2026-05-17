@@ -4,6 +4,7 @@ from app.api.v1 import (
     appointments,
     emergency_contacts,
     health_conditions,
+    medications,
     patient_profile,
     caregiver,
 )
@@ -14,5 +15,6 @@ router.include_router(dose_logs.router)
 router.include_router(appointments.router)
 router.include_router(emergency_contacts.router)
 router.include_router(health_conditions.router)
+router.include_router(medications.router)
 router.include_router(patient_profile.router)
 router.include_router(caregiver.router)
