@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+apscheduler==3.10.4
+firebase-admin
+supabase
+pydantic-settings
+pydantic>=2.0
+pytest
+pytest-asyncio
+httpx
