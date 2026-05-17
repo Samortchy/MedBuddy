@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/test_caregiver.py -v)",
+      "PowerShell(pip install *)"
+    ]
+  }
+}
