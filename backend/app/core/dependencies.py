@@ -11,16 +11,6 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_security),
     db: Client = Depends(get_db),
 ) -> dict:
-    """
-    Returns the authenticated user's IDs and role.
-
-    Returns:
-        {
-            "profile_id": str,          # profiles.id (Supabase Auth UUID)
-            "patient_profile_id": str,  # patient_profiles.id
-            "role": str                 # "patient" or "caregiver"
-        }
-    """
     return await verify_jwt(credentials.credentials, db)
 
 

@@ -72,17 +72,23 @@ async def update_patient_profile(
         profile_fields["date_of_birth"] = payload.date_of_birth.isoformat()
     if payload.avatar_url is not None:
         profile_fields["avatar_url"] = payload.avatar_url
+    if payload.preferred_language is not None:
+        profile_fields["preferred_language"] = payload.preferred_language
 
     # Fields that live in the patient_profiles table
     patient_fields = {}
-    if payload.weight_kg is not None:
-        patient_fields["weight_kg"] = payload.weight_kg
-    if payload.height_cm is not None:
-        patient_fields["height_cm"] = payload.height_cm
-    if payload.blood_type is not None:
-        patient_fields["blood_type"] = payload.blood_type
-    if payload.allergies is not None:
-        patient_fields["allergies"] = payload.allergies
+    if payload.mobility_level is not None:
+        patient_fields["mobility_level"] = payload.mobility_level.value
+    if payload.cognitive_state is not None:
+        patient_fields["cognitive_state"] = payload.cognitive_state.value
+    if payload.fall_detection_enabled is not None:
+        patient_fields["fall_detection_enabled"] = payload.fall_detection_enabled
+    if payload.checkin_time is not None:
+        patient_fields["checkin_time"] = payload.checkin_time
+    if payload.checkin_frequency is not None:
+        patient_fields["checkin_frequency"] = payload.checkin_frequency
+    if payload.medication_grace_mins is not None:
+        patient_fields["medication_grace_mins"] = payload.medication_grace_mins
 
     if not profile_fields and not patient_fields:
         raise HTTPException(

@@ -7,17 +7,23 @@
 #include "generated_plugin_registrant.h"
 
 #include <agora_rtc_engine/agora_rtc_engine_plugin.h>
+#include <app_links/app_links_plugin_c_api.h>
 #include <flutter_tts/flutter_tts_plugin.h>
 #include <iris_method_channel/iris_method_channel_plugin_c_api.h>
 #include <speech_to_text_windows/speech_to_text_windows.h>
+#include <url_launcher_windows/url_launcher_windows.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
   AgoraRtcEnginePluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("AgoraRtcEnginePlugin"));
+  AppLinksPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("AppLinksPluginCApi"));
   FlutterTtsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FlutterTtsPlugin"));
   IrisMethodChannelPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("IrisMethodChannelPluginCApi"));
   SpeechToTextWindowsRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("SpeechToTextWindows"));
+  UrlLauncherWindowsRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("UrlLauncherWindows"));
 }

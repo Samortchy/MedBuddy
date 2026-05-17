@@ -38,11 +38,11 @@ async def create_caregiver_invite(
     expires_at = datetime.now(timezone.utc) + timedelta(hours=_INVITE_EXPIRY_HOURS)
     code = _generate_invite_code()
 
-    result = db.table("caregiver_invites").insert({
+    # Table: invite_codes (not caregiver_invites)
+    result = db.table("invite_codes").insert({
         "patient_id": patient_id,
         "code": code,
         "expires_at": expires_at.isoformat(),
-        "used": False,
     }).execute()
 
     if not result.data:
@@ -77,11 +77,12 @@ async def accept_caregiver_invite(
     """
     now = datetime.now(timezone.utc)
 
+    # Table: invite_codes — check used_at is null (not used=False)
     invite_result = (
-        db.table("caregiver_invites")
+        db.table("invite_codes")
         .select("*")
         .eq("code", payload.code.upper())
-        .eq("used", False)
+        .is_("used_at", "null")
         .single()
         .execute()
     )
@@ -93,8 +94,9 @@ async def accept_caregiver_invite(
         )
 
     invite = invite_result.data
-    expires_at_str = invite["expires_at"]
+
     # Normalise the ISO string from Supabase (may end with 'Z' or '+00:00')
+    expires_at_str = invite["expires_at"]
     if expires_at_str.endswith("Z"):
         expires_at_str = expires_at_str[:-1] + "+00:00"
     expires_at = datetime.fromisoformat(expires_at_str)
@@ -109,8 +111,9 @@ async def accept_caregiver_invite(
 
     caregiver_id = current_user["profile_id"]
 
+    # Table: caregiver_patient_links (not caregiver_patients)
     existing = (
-        db.table("caregiver_patients")
+        db.table("caregiver_patient_links")
         .select("id")
         .eq("caregiver_id", caregiver_id)
         .eq("patient_id", invite["patient_id"])
@@ -123,9 +126,12 @@ async def accept_caregiver_invite(
             detail="You are already linked to this patient.",
         )
 
-    link_result = db.table("caregiver_patients").insert({
+    # Table: caregiver_patient_links (not caregiver_patients)
+    link_result = db.table("caregiver_patient_links").insert({
         "caregiver_id": caregiver_id,
         "patient_id": invite["patient_id"],
+        "status": "active",
+        "linked_at": now.isoformat(),
     }).execute()
 
     if not link_result.data:
@@ -134,8 +140,9 @@ async def accept_caregiver_invite(
             detail="Failed to link caregiver to patient.",
         )
 
-    db.table("caregiver_invites").update({
-        "used": True,
+    # Mark invite as used — set used_at and used_by (not used=True)
+    db.table("invite_codes").update({
+        "used_at": now.isoformat(),
         "used_by": caregiver_id,
     }).eq("id", invite["id"]).execute()
 
@@ -164,11 +171,13 @@ async def get_caregiver_patients(
     """
     caregiver_id = current_user["profile_id"]
 
+    # Table: caregiver_patient_links (not caregiver_patients)
     result = (
-        db.table("caregiver_patients")
-        .select("id, created_at, patient_id, patient_profiles(id, profiles(full_name, phone, date_of_birth))")
+        db.table("caregiver_patient_links")
+        .select("id, linked_at, patient_id, patient_profiles(id, profiles(full_name, phone, date_of_birth))")
         .eq("caregiver_id", caregiver_id)
-        .order("created_at", desc=True)
+        .eq("status", "active")
+        .order("linked_at", desc=True)
         .execute()
     )
 
@@ -181,7 +190,7 @@ async def get_caregiver_patients(
             "full_name": profile.get("full_name"),
             "phone": profile.get("phone"),
             "date_of_birth": profile.get("date_of_birth"),
-            "linked_at": row["created_at"],
+            "linked_at": row["linked_at"],
         })
 
     return {

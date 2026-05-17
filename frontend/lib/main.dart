@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
 // ── Constants ─────────────────────────────────────────────────────────────────
 import 'constants/colors.dart';
 
@@ -51,7 +51,12 @@ import 'screens/caregiver/c03_alerts_feed.dart';
 import 'screens/caregiver/c08_caregiver_chat.dart';
 import 'screens/caregiver/c11_settings.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: 'https://tcyrehuatbtlfvnttkgc.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjeXJlaHVhdGJ0bGZ2bnR0a2djIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1ODI3NzUsImV4cCI6MjA5MzE1ODc3NX0.MJsuJRl0GDqKo1a-eVBYNEjrD98DHG2g0F6Pcz5RkC8',
+  );
   runApp(const ProviderScope(child: MedBuddyApp()));
 }
 
