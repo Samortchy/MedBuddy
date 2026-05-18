@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../constants/colors.dart';
 import '../../../constants/dimens.dart';
 import '../../../constants/text_styles.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../widgets/shared/sos_button.dart';
 import '../../../widgets/shared/bottom_nav_bar.dart';
 
@@ -12,7 +14,7 @@ import '../../../widgets/shared/bottom_nav_bar.dart';
 /// - [onExportData]   → Trigger data export
 /// - [onDeleteAccount]→ Trigger account deletion flow
 /// - [onTestSOS]      → Trigger a test SOS alert
-class AppSettingsScreen extends StatefulWidget {
+class AppSettingsScreen extends ConsumerStatefulWidget {
   // Notification settings
   final bool reminderSoundEnabled;
   final bool vibrationEnabled;
@@ -60,10 +62,10 @@ class AppSettingsScreen extends StatefulWidget {
   });
 
   @override
-  State<AppSettingsScreen> createState() => _AppSettingsScreenState();
+  ConsumerState<AppSettingsScreen> createState() => _AppSettingsScreenState();
 }
 
-class _AppSettingsScreenState extends State<AppSettingsScreen> {
+class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen> {
   late bool _reminderSound;
   late bool _vibration;
   late double _reminderVolume;
@@ -460,6 +462,18 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
         labelColor: MedBuddyColors.emergency,
         iconColor: MedBuddyColors.emergency,
         onTap: widget.onDeleteAccount,
+      ),
+      _chevronRow(
+        icon: Icons.logout,
+        label: 'Sign out',
+        labelColor: MedBuddyColors.emergency,
+        iconColor: MedBuddyColors.emergency,
+        onTap: () async {
+          await ref.read(authProvider.notifier).signOut();
+          if (!mounted) return;
+          Navigator.of(context)
+              .pushNamedAndRemoveUntil('/welcome', (_) => false);
+        },
       ),
     ]);
   }

@@ -1,16 +1,21 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import Client
+import logging
 from app.core.database import get_db
 from app.core.auth import verify_jwt
+
+logger = logging.getLogger(__name__)
 
 _security = HTTPBearer()
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(_security),
     db: Client = Depends(get_db),
 ) -> dict:
+    logger.info(f"Auth → {request.method} {request.url.path}")
     return await verify_jwt(credentials.credentials, db)
 
 

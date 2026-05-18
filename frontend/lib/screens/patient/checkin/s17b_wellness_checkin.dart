@@ -1,19 +1,19 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../constants/colors.dart';
 import '../../../constants/dimens.dart';
 import '../../../constants/text_styles.dart';
 import '../../../services/service_interfaces.dart';
 import '../../../widgets/shared/sos_button.dart';
 
-/// S-17b — Wellness Check-in Active
+/// S-17b â€” Wellness Check-in Active
 ///
-/// Full-screen check-in experience. No bottom nav — focused flow.
+/// Full-screen check-in experience. No bottom nav â€” focused flow.
 ///
 /// Backend hooks:
-/// - [aiService]  → AIService.startCheckIn() / submitCheckInAnswer()
-/// - [sttService] → STTService for voice answers
-/// - [ttsService] → TTSService to read questions aloud
-/// - [onComplete] → Called when all questions are answered
+/// - [aiService]  â†’ AIService.startCheckIn() / submitCheckInAnswer()
+/// - [sttService] â†’ STTService for voice answers
+/// - [ttsService] â†’ TTSService to read questions aloud
+/// - [onComplete] â†’ Called when all questions are answered
 class WellnessCheckInScreen extends StatefulWidget {
   final AIService? aiService;
   final STTService? sttService;
@@ -74,7 +74,7 @@ class _WellnessCheckInScreenState extends State<WellnessCheckInScreen>
     // _initSession();
   }
 
-  // ── Backend hook: init session ────────────────────────────────
+  // â”€â”€ Backend hook: init session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Future<void> _initSession() async {
   //   final session = await widget.aiService?.startCheckIn();
   //   if (session != null && mounted) {
@@ -96,7 +96,7 @@ class _WellnessCheckInScreenState extends State<WellnessCheckInScreen>
     super.dispose();
   }
 
-  // ── Backend hook: submit answer ────────────────────────────────
+  // â”€â”€ Backend hook: submit answer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> _submitAnswer(String answer) async {
     // TODO:
     // final nextQuestion = await widget.aiService
@@ -112,7 +112,7 @@ class _WellnessCheckInScreenState extends State<WellnessCheckInScreen>
     // widget.ttsService?.speak(_questionText);
   }
 
-  // ── Backend hook: toggle mic ───────────────────────────────────
+  // â”€â”€ Backend hook: toggle mic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> _toggleListening() async {
     if (_isListening) {
       setState(() => _isListening = false);
@@ -277,7 +277,7 @@ class _WellnessCheckInScreenState extends State<WellnessCheckInScreen>
   Widget _buildWaveform() {
     return AnimatedBuilder(
       animation: _waveController,
-      builder: (_, __) {
+      builder: (context, _) {
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(15, (i) {

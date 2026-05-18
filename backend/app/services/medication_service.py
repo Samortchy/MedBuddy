@@ -43,7 +43,9 @@ async def generate_doses_for_patient(
         end_date = _parse_date(med.get("end_date"))
 
         for schedule in schedules:
-            hour, minute = map(int, schedule["time_of_day"].split(":"))
+            # DB returns time as "HH:MM:SS" — only take first two parts
+            parts = str(schedule["time_of_day"]).split(":")
+            hour, minute = int(parts[0]), int(parts[1])
 
             current_day = max(now.date(), start_date)
             while current_day <= window_end.date():
@@ -65,7 +67,6 @@ async def generate_doses_for_patient(
                     doses_to_insert.append({
                         "medication_id": medication_id,
                         "scheduled_at": scheduled_at.isoformat(),
-                        "status": "pending",
                     })
 
                 current_day += timedelta(days=1)

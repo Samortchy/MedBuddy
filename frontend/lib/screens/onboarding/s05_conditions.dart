@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/constants/colors.dart';
 import '/constants/dimens.dart';
 import '/constants/text_styles.dart';
+import '/providers/onboarding_provider.dart';
 import 's06_mobility.dart';
 
-class S05Conditions extends StatefulWidget {
+class S05Conditions extends ConsumerStatefulWidget {
   const S05Conditions({super.key});
 
   @override
-  State<S05Conditions> createState() => _S05ConditionsState();
+  ConsumerState<S05Conditions> createState() => _S05ConditionsState();
 }
 
-class _S05ConditionsState extends State<S05Conditions> {
+class _S05ConditionsState extends ConsumerState<S05Conditions> {
   final Set<String> selectedConditions = {};
   String duration = '';
   final _otherController = TextEditingController();
@@ -242,10 +244,21 @@ class _S05ConditionsState extends State<S05Conditions> {
                 width: double.infinity,
                 height: MedBuddyDimens.buttonHeightPrimary,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const S06Mobility()),
-                  ),
+                  onPressed: () {
+                    final condList = [
+                      ...selectedConditions,
+                      if (showOther && _otherController.text.trim().isNotEmpty)
+                        _otherController.text.trim(),
+                    ];
+                    ref.read(onboardingProvider.notifier).setConditions(
+                          conditions: condList,
+                          duration: duration.isEmpty ? 'chronic' : duration,
+                        );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const S06Mobility()),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: MedBuddyColors.primary,
                     foregroundColor: MedBuddyColors.pureWhite,

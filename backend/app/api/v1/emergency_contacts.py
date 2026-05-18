@@ -71,37 +71,50 @@ async def create_emergency_contact(
     """
     patient_id = current_user["patient_profile_id"]
 
-    # Enforce max 5 contacts
-    existing = (
+    # Check if a contact with this priority already exists (will be updated, not inserted)
+    priority_check = (
         db.table("emergency_contacts")
-        .select("id", count="exact")
+        .select("id")
         .eq("patient_id", patient_id)
+        .eq("priority", payload.priority)
+        .maybe_single()
         .execute()
     )
+    is_update = priority_check.data is not None
 
-    current_count = existing.count or 0
-    if current_count >= MAX_CONTACTS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Maximum of {MAX_CONTACTS} emergency contacts allowed per patient.",
+    # Only enforce the count limit when creating a genuinely new contact
+    if not is_update:
+        count_result = (
+            db.table("emergency_contacts")
+            .select("id", count="exact")
+            .eq("patient_id", patient_id)
+            .execute()
         )
+        if (count_result.count or 0) >= MAX_CONTACTS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Maximum of {MAX_CONTACTS} emergency contacts allowed per patient.",
+            )
 
-    insert_data = {
+    upsert_data: dict = {
         "patient_id": patient_id,
         "name": payload.name,
         "phone": payload.phone,
         "priority": payload.priority,
     }
-
     if payload.relationship:
-        insert_data["relationship"] = payload.relationship
+        upsert_data["relationship"] = payload.relationship
 
-    result = db.table("emergency_contacts").insert(insert_data).execute()
+    result = (
+        db.table("emergency_contacts")
+        .upsert(upsert_data, on_conflict="patient_id,priority")
+        .execute()
+    )
 
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create emergency contact.",
+            detail="Failed to save emergency contact.",
         )
 
     return result.data[0]

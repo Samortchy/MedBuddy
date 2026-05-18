@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/constants/colors.dart';
 import '/constants/dimens.dart';
 import '/constants/text_styles.dart';
+import '/providers/onboarding_provider.dart';
 import 's09_checkin_prefs.dart';
 
-class S08EmergencyContacts extends StatefulWidget {
+class S08EmergencyContacts extends ConsumerStatefulWidget {
   const S08EmergencyContacts({super.key});
 
   @override
-  State<S08EmergencyContacts> createState() => _S08EmergencyContactsState();
+  ConsumerState<S08EmergencyContacts> createState() =>
+      _S08EmergencyContactsState();
 }
 
-class _S08EmergencyContactsState extends State<S08EmergencyContacts> {
+class _S08EmergencyContactsState extends ConsumerState<S08EmergencyContacts> {
   final _primaryNameCtrl = TextEditingController();
   final _primaryPhoneCtrl = TextEditingController();
   final _secondaryNameCtrl = TextEditingController();
@@ -225,11 +228,32 @@ class _S08EmergencyContactsState extends State<S08EmergencyContacts> {
                 height: MedBuddyDimens.buttonHeightPrimary,
                 child: ElevatedButton(
                   onPressed: canProceed
-                      ? () => Navigator.push(
+                      ? () {
+                          final contacts = <OnboardingContact>[
+                            OnboardingContact(
+                              name: _primaryNameCtrl.text.trim(),
+                              phone: _primaryPhoneCtrl.text.trim(),
+                              relation: primaryRelation,
+                              priority: 1,
+                            ),
+                            if (showSecondary &&
+                                _secondaryNameCtrl.text.trim().isNotEmpty)
+                              OnboardingContact(
+                                name: _secondaryNameCtrl.text.trim(),
+                                phone: _secondaryPhoneCtrl.text.trim(),
+                                relation: secondaryRelation,
+                                priority: 2,
+                              ),
+                          ];
+                          ref
+                              .read(onboardingProvider.notifier)
+                              .setContacts(contacts);
+                          Navigator.push(
                             context,
                             MaterialPageRoute(
                                 builder: (_) => const S09CheckinPrefs()),
-                          )
+                          );
+                        }
                       : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: MedBuddyColors.primary,

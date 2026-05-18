@@ -1,13 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/constants/colors.dart';
 import '/constants/dimens.dart';
 import '/constants/text_styles.dart';
+import '/providers/onboarding_provider.dart';
 
-class S10Review extends StatelessWidget {
+class S10Review extends ConsumerStatefulWidget {
   const S10Review({super.key});
 
   @override
+  ConsumerState<S10Review> createState() => _S10ReviewState();
+}
+
+class _S10ReviewState extends ConsumerState<S10Review> {
+  bool _submitting = false;
+  String? _error;
+
+  Future<void> _confirm() async {
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await ref.read(onboardingProvider.notifier).submit();
+      if (!mounted) return;
+      Navigator.of(context)
+          .pushNamedAndRemoveUntil('/home', (route) => false);
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _submitting = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final data = ref.watch(onboardingProvider);
+
     return Scaffold(
       backgroundColor: MedBuddyColors.warmWhite,
       body: SafeArea(
@@ -43,11 +73,16 @@ class S10Review extends StatelessWidget {
                     _ReviewCard(
                       step: '01',
                       title: 'Basic Information',
-                      onEdit: () => Navigator.of(context).pushNamed('/profile/basic'),
-                      children: const [
-                        _ReviewRow(label: 'Name', value: 'Hassan Ali'),
-                        _ReviewRow(label: 'Age', value: '72'),
-                        _ReviewRow(label: 'Gender', value: 'Male'),
+                      onEdit: () =>
+                          Navigator.of(context).pushNamed('/profile/basic'),
+                      children: [
+                        _ReviewRow(
+                            label: 'Name',
+                            value: data.fullName.isEmpty ? '—' : data.fullName),
+                        _ReviewRow(label: 'Age', value: '${data.age}'),
+                        _ReviewRow(
+                            label: 'Gender',
+                            value: data.gender.isEmpty ? '—' : data.gender),
                       ],
                     ),
                     const SizedBox(height: MedBuddyDimens.spacingMd),
@@ -55,13 +90,21 @@ class S10Review extends StatelessWidget {
                     _ReviewCard(
                       step: '02',
                       title: 'Health Conditions',
-                      onEdit: () => Navigator.of(context).pushNamed('/profile/conditions'),
-                      children: const [
+                      onEdit: () =>
+                          Navigator.of(context).pushNamed('/profile/conditions'),
+                      children: [
                         _ReviewRow(
-                            label: 'Conditions',
-                            value: 'Diabetes, Hypertension'),
+                          label: 'Conditions',
+                          value: data.conditions.isEmpty
+                              ? 'None'
+                              : data.conditions.join(', '),
+                        ),
                         _ReviewRow(
-                            label: 'Duration', value: 'Long-term / Chronic'),
+                          label: 'Duration',
+                          value: data.conditionDuration == 'chronic'
+                              ? 'Long-term / Chronic'
+                              : 'New',
+                        ),
                       ],
                     ),
                     const SizedBox(height: MedBuddyDimens.spacingMd),
@@ -69,11 +112,12 @@ class S10Review extends StatelessWidget {
                     _ReviewCard(
                       step: '03',
                       title: 'Mobility & Cognitive State',
-                      onEdit: () => Navigator.of(context).pushNamed('/profile/mobility'),
-                      children: const [
-                        _ReviewRow(label: 'Mobility', value: 'Fully Mobile'),
+                      onEdit: () =>
+                          Navigator.of(context).pushNamed('/profile/mobility'),
+                      children: [
+                        _ReviewRow(label: 'Mobility', value: data.mobilityLevel),
                         _ReviewRow(
-                            label: 'Cognition', value: 'Fully Independent'),
+                            label: 'Cognition', value: data.cognitiveState),
                       ],
                     ),
                     const SizedBox(height: MedBuddyDimens.spacingMd),
@@ -81,39 +125,52 @@ class S10Review extends StatelessWidget {
                     _ReviewCard(
                       step: '04',
                       title: 'Medications',
-                      onEdit: () => Navigator.of(context).pushNamed('/profile/meds'),
-                      children: const [
-                        _ReviewRow(
-                            label: 'Metformin', value: '500mg · Twice daily'),
-                        _ReviewRow(
-                            label: 'Amlodipine', value: '5mg · Once daily'),
-                      ],
+                      onEdit: () =>
+                          Navigator.of(context).pushNamed('/profile/meds'),
+                      children: data.medications.isEmpty
+                          ? [const _ReviewRow(label: 'None added', value: '')]
+                          : data.medications
+                              .map((m) => _ReviewRow(
+                                    label: m.name,
+                                    value:
+                                        '${m.dosage} · ${m.frequency}',
+                                  ))
+                              .toList(),
                     ),
                     const SizedBox(height: MedBuddyDimens.spacingMd),
 
                     _ReviewCard(
                       step: '05',
                       title: 'Emergency Contacts',
-                      onEdit: () => Navigator.of(context).pushNamed('/profile/contacts'),
-                      children: const [
-                        _ReviewRow(
-                            label: 'Primary', value: 'Bakr Mohamed · Son'),
-                        _ReviewRow(label: 'Phone', value: '+20 100 000 0000'),
-                      ],
+                      onEdit: () =>
+                          Navigator.of(context).pushNamed('/profile/contacts'),
+                      children: data.contacts.isEmpty
+                          ? [const _ReviewRow(label: 'None added', value: '')]
+                          : data.contacts
+                              .map((c) => _ReviewRow(
+                                    label: c.priority == 1
+                                        ? 'Primary'
+                                        : 'Secondary',
+                                    value: '${c.name} · ${c.relation}',
+                                  ))
+                              .toList(),
                     ),
                     const SizedBox(height: MedBuddyDimens.spacingMd),
 
                     _ReviewCard(
                       step: '06',
                       title: 'Check-in Preferences',
-                      onEdit: () => Navigator.of(context).pushNamed('/profile/checkin'),
-                      children: const [
-                        _ReviewRow(label: 'Time', value: 'Morning'),
-                        _ReviewRow(label: 'Modality', value: 'Voice'),
-                        _ReviewRow(label: 'Frequency', value: 'Daily'),
+                      onEdit: () =>
+                          Navigator.of(context).pushNamed('/profile/checkin'),
+                      children: [
+                        _ReviewRow(label: 'Time', value: data.checkinTime),
                         _ReviewRow(
-                            label: 'Pain baseline',
-                            value: '3 / 10 — Mild pain'),
+                            label: 'Frequency', value: data.checkinFrequency),
+                        _ReviewRow(
+                          label: 'Pain baseline',
+                          value:
+                              '${data.painBaseline.toStringAsFixed(1)} / 10',
+                        ),
                       ],
                     ),
 
@@ -146,6 +203,24 @@ class S10Review extends StatelessWidget {
                       ),
                     ),
 
+                    if (_error != null) ...[
+                      const SizedBox(height: MedBuddyDimens.spacingMd),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(MedBuddyDimens.spacingMd),
+                        decoration: BoxDecoration(
+                          color: MedBuddyColors.emergency.withValues(alpha: 0.08),
+                          borderRadius:
+                              BorderRadius.circular(MedBuddyDimens.radiusMd),
+                        ),
+                        child: Text(
+                          _error!,
+                          style: MedBuddyTextStyles.secondary
+                              .copyWith(color: MedBuddyColors.emergency),
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: MedBuddyDimens.spacingXxl),
                   ],
                 ),
@@ -157,24 +232,32 @@ class S10Review extends StatelessWidget {
                 width: double.infinity,
                 height: MedBuddyDimens.buttonHeightPrimary,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context)
-                        .pushNamedAndRemoveUntil('/home', (route) => false);
-                  },
+                  onPressed: _submitting ? null : _confirm,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: MedBuddyColors.primary,
                     foregroundColor: MedBuddyColors.pureWhite,
+                    disabledBackgroundColor:
+                        MedBuddyColors.primary.withValues(alpha: 0.6),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius:
                           BorderRadius.circular(MedBuddyDimens.radiusLg),
                     ),
                   ),
-                  child: Text(
-                    'Confirm & Enter MedBuddy',
-                    style: MedBuddyTextStyles.bodyBold
-                        .copyWith(color: MedBuddyColors.pureWhite),
-                  ),
+                  child: _submitting
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'Confirm & Enter MedBuddy',
+                          style: MedBuddyTextStyles.bodyBold
+                              .copyWith(color: MedBuddyColors.pureWhite),
+                        ),
                 ),
               ),
             ),

@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/constants/colors.dart';
+import '/providers/caregiver_provider.dart';
 import 'c04_patient_dashboard.dart';
 import 'c02_add_patient.dart';
 import 'c10_pending_link_approval.dart';
 
-class C01PatientList extends StatelessWidget {
+class C01PatientList extends ConsumerWidget {
   const C01PatientList({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final patients = [
-      {'name': 'Hassan Ali', 'lastCheckin': '30 min ago', 'status': 'green'},
-      {'name': 'Fatma Khaled', 'lastCheckin': '3 hours ago', 'status': 'amber'},
-      {'name': 'Mohamed Samir', 'lastCheckin': 'EMERGENCY', 'status': 'red'},
-    ];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final patientsState = ref.watch(caregiverPatientsProvider);
 
     return Scaffold(
       backgroundColor: MedColors.warmWhite,
@@ -29,7 +27,8 @@ class C01PatientList extends StatelessWidget {
             icon: const Icon(Icons.pending_actions, color: Colors.white),
             tooltip: 'Pending Approvals',
             onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const C10PendingLinkApproval())),
+                MaterialPageRoute(
+                    builder: (_) => const C10PendingLinkApproval())),
           ),
           IconButton(
             icon: const Icon(Icons.person_add, color: Colors.white),
@@ -38,17 +37,46 @@ class C01PatientList extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: patients.length,
-        itemBuilder: (context, index) {
-          final patient = patients[index];
-          return _PatientCard(
-            name: patient['name']!,
-            lastCheckin: patient['lastCheckin']!,
-            status: patient['status']!,
-          );
-        },
+      body: patientsState.when(
+        loading: () => const Center(
+            child: CircularProgressIndicator(color: MedColors.primary)),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Failed to load patients',
+                  style: TextStyle(color: MedColors.emergency)),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () =>
+                    ref.read(caregiverPatientsProvider.notifier).fetch(),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+        data: (patients) => patients.isEmpty
+            ? const Center(
+                child: Text('No linked patients yet.',
+                    style: TextStyle(color: MedColors.slate500)))
+            : RefreshIndicator(
+                color: MedColors.primary,
+                onRefresh: () =>
+                    ref.read(caregiverPatientsProvider.notifier).fetch(),
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: patients.length,
+                  itemBuilder: (context, index) {
+                    final p = patients[index];
+                    return _PatientCard(
+                      name: p.fullName,
+                      lastCheckin: p.lastCheckinDisplay,
+                      status: 'green',
+                      patientId: p.id,
+                    );
+                  },
+                ),
+              ),
       ),
     );
   }
@@ -58,11 +86,13 @@ class _PatientCard extends StatelessWidget {
   final String name;
   final String lastCheckin;
   final String status;
+  final String patientId;
 
   const _PatientCard({
     required this.name,
     required this.lastCheckin,
     required this.status,
+    required this.patientId,
   });
 
   Color get dotColor {
@@ -86,6 +116,7 @@ class _PatientCard extends StatelessWidget {
             patientName: name,
             lastCheckin: lastCheckin,
             status: status,
+            patientId: patientId,
           ),
         ),
       ),

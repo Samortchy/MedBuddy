@@ -7,11 +7,7 @@ import '../../../widgets/shared/sos_button.dart';
 import '../../../widgets/shared/bottom_nav_bar.dart';
 
 /// S-22 — Wellness History
-///
-/// Backend hooks:
-/// - [checkIns] → List<WellnessCheckIn> from your data layer
-/// - [onExport] → Called to generate PDF report (wire to your PDF service)
-/// - [onDateRangeChanged] → Fetch new data for selected range
+
 class WellnessHistoryScreen extends StatefulWidget {
   final List<WellnessCheckIn> checkIns;
   final VoidCallback? onExport;

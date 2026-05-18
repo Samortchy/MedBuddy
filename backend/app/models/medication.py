@@ -33,6 +33,7 @@ class MedicationCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     dose_amount: float = Field(..., gt=0)
     dose_unit: DoseUnit
+    frequency: Optional[str] = None  # inferred from schedules if omitted
     form: Optional[MedicationForm] = None
     instructions: Optional[str] = None
     start_date: date
@@ -44,6 +45,7 @@ class MedicationUpdate(BaseModel):
     name: Optional[str] = None
     dose_amount: Optional[float] = None
     dose_unit: Optional[DoseUnit] = None
+    frequency: Optional[str] = None
     form: Optional[MedicationForm] = None
     instructions: Optional[str] = None
     start_date: Optional[date] = None

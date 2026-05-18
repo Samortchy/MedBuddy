@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/constants/colors.dart';
 import '/constants/dimens.dart';
 import '/constants/text_styles.dart';
+import '/providers/onboarding_provider.dart';
 import 's10_review.dart';
 
-class S09CheckinPrefs extends StatefulWidget {
+class S09CheckinPrefs extends ConsumerStatefulWidget {
   const S09CheckinPrefs({super.key});
 
   @override
-  State<S09CheckinPrefs> createState() => _S09CheckinPrefsState();
+  ConsumerState<S09CheckinPrefs> createState() => _S09CheckinPrefsState();
 }
 
-class _S09CheckinPrefsState extends State<S09CheckinPrefs> {
+class _S09CheckinPrefsState extends ConsumerState<S09CheckinPrefs> {
   String selectedTime = 'Morning';
   String selectedModality = 'Voice';
   String selectedFreq = 'Daily';
@@ -327,10 +329,17 @@ class _S09CheckinPrefsState extends State<S09CheckinPrefs> {
                 width: double.infinity,
                 height: MedBuddyDimens.buttonHeightPrimary,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const S10Review()),
-                  ),
+                  onPressed: () {
+                    ref.read(onboardingProvider.notifier).setCheckinPrefs(
+                          checkinTime: selectedTime,
+                          checkinFrequency: selectedFreq,
+                          painBaseline: painBaseline,
+                        );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const S10Review()),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: MedBuddyColors.primary,
                     foregroundColor: MedBuddyColors.pureWhite,

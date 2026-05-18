@@ -120,7 +120,7 @@ async def create_dose_log(
 
 @router.get(
     "/",
-    summary="Get dose logs for a specific date (defaults to today)",
+    summary="Get today's scheduled doses with their current status",
 )
 async def get_dose_logs(
     date: Optional[date] = Query(
@@ -131,42 +131,66 @@ async def get_dose_logs(
     db: Client = Depends(get_db),
 ):
     """
-    Returns all dose logs for the authenticated patient on a given date.
-    Used by the Flutter medication screen to show today's dose status.
-
-    Query params:
-        date: YYYY-MM-DD (optional, defaults to today)
+    Returns ALL scheduled doses for the given date (from medication_doses),
+    each with its current status overlaid from dose_logs.
+    Doses with no log entry are returned with status="pending".
+    This is what the Flutter medication schedule screen needs.
     """
     from datetime import datetime, timezone
 
     target_date = date or datetime.now(timezone.utc).date()
-
-    # Build date range for the full day
     day_start = f"{target_date}T00:00:00+00:00"
     day_end   = f"{target_date}T23:59:59+00:00"
+    patient_id = current_user["patient_profile_id"]
 
-    # Get dose logs for the patient's doses on this date
-    # Join: dose_logs → medication_doses → medications (scoped by patient_id)
-    result = (
-        db.table("dose_logs")
+    # 1. Get all scheduled doses for this patient on the target date
+    doses_result = (
+        db.table("medication_doses")
         .select(
-            "id, dose_id, status, actioned_at, noted_by, notes, "
-            "medication_doses(scheduled_at, medication_id, "
-            "medications(name, dose_amount, dose_unit, patient_id))"
+            "id, scheduled_at, medication_id, "
+            "medications(id, name, dose_amount, dose_unit, patient_id)"
         )
-        .gte("actioned_at", day_start)
-        .lte("actioned_at", day_end)
+        .gte("scheduled_at", day_start)
+        .lte("scheduled_at", day_end)
         .execute()
     )
 
-    # Filter client-side to only this patient's logs
-    # (service role bypasses RLS so we must manually scope)
-    patient_id = current_user["patient_profile_id"]
-    filtered = [
-        log for log in (result.data or [])
-        if log.get("medication_doses", {})
-           .get("medications", {})
-           .get("patient_id") == patient_id
+    doses = [
+        d for d in (doses_result.data or [])
+        if str((d.get("medications") or {}).get("patient_id", "")) == str(patient_id)
     ]
 
-    return {"date": str(target_date), "dose_logs": filtered}
+    if not doses:
+        return []
+
+    # 2. Get any logged actions for these doses
+    dose_ids = [d["id"] for d in doses]
+    logs_result = (
+        db.table("dose_logs")
+        .select("id, dose_id, status, actioned_at, noted_by, notes")
+        .in_("dose_id", dose_ids)
+        .execute()
+    )
+
+    # Map dose_id → most recent log entry
+    log_map: dict = {}
+    for log in (logs_result.data or []):
+        log_map[log["dose_id"]] = log
+
+    # 3. Return each scheduled dose with its status (pending if no log yet)
+    return [
+        {
+            "id":          log_map[d["id"]]["id"] if d["id"] in log_map else d["id"],
+            "dose_id":     d["id"],
+            "status":      log_map[d["id"]]["status"] if d["id"] in log_map else "pending",
+            "actioned_at": log_map[d["id"]].get("actioned_at") if d["id"] in log_map else None,
+            "noted_by":    log_map[d["id"]].get("noted_by") if d["id"] in log_map else None,
+            "notes":       log_map[d["id"]].get("notes") if d["id"] in log_map else None,
+            "medication_doses": {
+                "scheduled_at":  d["scheduled_at"],
+                "medication_id": d["medication_id"],
+                "medications":   d.get("medications") or {},
+            },
+        }
+        for d in doses
+    ]

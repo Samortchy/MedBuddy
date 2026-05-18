@@ -7,13 +7,6 @@ import '../../../widgets/shared/sos_button.dart';
 import '../../../widgets/shared/bottom_nav_bar.dart';
 
 /// S-23 — Medication Adherence History
-///
-/// Backend hooks:
-/// - [medications]      → List<MedicationEntry> for filter chips
-/// - [calendarData]     → Map<DateTime, MedicationStatus> for heatmap
-/// - [adherencePercent] → int 0–100 from your analytics layer
-/// - [onDayTapped]      → Fetch detail for a specific day
-/// - [onExport]         → Generate PDF adherence report
 class MedicationAdherenceScreen extends StatefulWidget {
   final List<MedicationEntry> medications;
   final Map<DateTime, MedicationStatus> calendarData;
@@ -46,22 +39,13 @@ class _MedicationAdherenceScreenState extends State<MedicationAdherenceScreen> {
   DateTime _selectedDay = DateTime(2026, 4, 3);
   DateTime _displayedMonth = DateTime(2026, 4, 1);
 
-  // Placeholder filter names — replace with widget.medications names
-  List<String> get _filterOptions => {
-        'All',
-        ...widget.medications.map((m) => m.name)
-      }.toList().take(4).toList().isEmpty
-          ? ['All', 'Metformin', 'Lisinopril', 'Aspirin']
-          : ['All', ...widget.medications.map((m) => m.name)];
+  List<String> get _filterOptions => widget.medications.isEmpty
+      ? ['All']
+      : ['All', ...widget.medications.map((m) => m.name).take(4)];
 
-  // Placeholder calendar — replace with widget.calendarData
   MedicationStatus _statusForDay(int day) {
-    // TODO: return widget.calendarData[DateTime(year, month, day)] ?? MedicationStatus.pending
-    const missed = [22, 29, 30];
-    const late = [20, 23];
-    if (missed.contains(day)) return MedicationStatus.missed;
-    if (late.contains(day)) return MedicationStatus.late;
-    return MedicationStatus.taken;
+    final key = DateTime(_displayedMonth.year, _displayedMonth.month, day);
+    return widget.calendarData[key] ?? MedicationStatus.pending;
   }
 
   Color _colorForStatus(MedicationStatus? status, bool isFuture) {

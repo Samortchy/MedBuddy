@@ -16,6 +16,14 @@ import 'screens/onboarding/s08_emergency_contacts.dart';
 import 'screens/onboarding/s09_checkin_prefs.dart';
 import 'screens/onboarding/s10_review.dart';
 
+// ── Auth guard ────────────────────────────────────────────────────────────────
+import 'providers/auth_provider.dart';
+import 'providers/history_providers.dart';
+import 'providers/medication_provider.dart';
+import 'providers/patient_provider.dart';
+import 'services/api_service.dart';
+import 'services/service_interfaces.dart';
+
 // ── Patient: Home & Meds ──────────────────────────────────────────────────────
 import 'screens/patient/home/home.dart';
 import 'screens/patient/medications/med_schedule.dart';
@@ -77,7 +85,7 @@ class MedBuddyApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
       ),
-      home: const S01Welcome(),
+      home: const AuthGate(),
       routes: {
         // ── Onboarding ────────────────────────────────────────────────
         '/welcome': (_) => const S01Welcome(),
@@ -118,16 +126,194 @@ class MedBuddyApp extends StatelessWidget {
         '/checkin': (_) => const WellnessCheckInScreen(),
 
         // ── Patient History ────────────────────────────────────────────
-        '/wellness-history': (_) => const WellnessHistoryScreen(),
-        '/med-adherence': (_) => const MedicationAdherenceScreen(),
-        '/emergency-log': (_) => const EmergencyEventLogScreen(),
-        '/symptom-log': (_) => const SymptomLogScreen(),
+        '/wellness-history': (_) => const _WellnessHistoryRoute(),
+        '/med-adherence': (_) => const _MedicationAdherenceRoute(),
+        '/emergency-log': (_) => const _EmergencyLogRoute(),
+        '/symptom-log': (_) => const _SymptomLogRoute(),
         '/visit-summary': (_) => const VisitSummaryScreen(),
 
         // ── Patient Profile ────────────────────────────────────────────
-        '/my-profile': (_) => const MyProfileScreen(),
+        '/my-profile': (_) => const _MyProfileRoute(),
         '/chat': (_) => const PatientChatScreen(),
         '/settings': (_) => const AppSettingsScreen(),
+      },
+    );
+  }
+}
+
+// ── History route wrappers ────────────────────────────────────────────────────
+
+class _WellnessHistoryRoute extends ConsumerWidget {
+  const _WellnessHistoryRoute();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(wellnessCheckInsProvider);
+    return WellnessHistoryScreen(
+      checkIns: state.valueOrNull ?? [],
+    );
+  }
+}
+
+class _EmergencyLogRoute extends ConsumerWidget {
+  const _EmergencyLogRoute();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(emergencyEventsProvider);
+    return EmergencyEventLogScreen(
+      events: state.valueOrNull ?? [],
+    );
+  }
+}
+
+class _SymptomLogRoute extends ConsumerWidget {
+  const _SymptomLogRoute();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(symptomLogProvider);
+    return SymptomLogScreen(
+      entries: state.valueOrNull ?? [],
+      onAddEntry: (description) =>
+          ref.read(symptomLogProvider.notifier).add(description),
+    );
+  }
+}
+
+class _MyProfileRoute extends ConsumerWidget {
+  const _MyProfileRoute();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileState = ref.watch(patientProfileProvider);
+    final conditionsState = ref.watch(healthConditionsProvider);
+    final contactsState = ref.watch(emergencyContactsProvider);
+
+    final data = profileState.valueOrNull;
+    final conditions = conditionsState.valueOrNull ?? [];
+    final contacts = contactsState.valueOrNull ?? [];
+    final primaryContact =
+        contacts.isNotEmpty ? contacts.first : null;
+
+    final profile = data == null
+        ? null
+        : PatientProfile(
+            id: data.id,
+            fullName: data.fullName,
+            age: _ageFromDob(data.dateOfBirth),
+            gender: '',
+            language: data.preferredLanguage ?? 'English',
+            conditions: conditions,
+            medications: const [],
+            primaryContactName: primaryContact?.name ?? '',
+            primaryContactPhone: primaryContact?.phone ?? '',
+            primaryContactRelationship:
+                primaryContact?.relationship ?? '',
+            checkInHour: 9,
+            checkInVoiceMode: false,
+            painBaseline: 0,
+            caregivers: const [],
+            profileCompleteness: 80,
+          );
+
+    return MyProfileScreen(
+      profile: profile,
+      onGenerateInvite: () async {
+        final dio = ref.read(apiServiceProvider);
+        final response = await dio.post('/caregiver/invite');
+        return response.data['code'] as String;
+      },
+    );
+  }
+
+  int _ageFromDob(String? dob) {
+    if (dob == null) return 0;
+    try {
+      final birth = DateTime.parse(dob);
+      final now = DateTime.now();
+      int age = now.year - birth.year;
+      if (now.month < birth.month ||
+          (now.month == birth.month && now.day < birth.day)) {
+        age--;
+      }
+      return age;
+    } catch (_) {
+      return 0;
+    }
+  }
+}
+
+class _MedicationAdherenceRoute extends ConsumerWidget {
+  const _MedicationAdherenceRoute();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final medState = ref.watch(medicationProvider);
+
+    final medications = medState.medications
+        .map((m) => MedicationEntry(
+              id: m.id,
+              name: m.name,
+              dose: m.dosage,
+              frequency: m.frequency,
+              status: MedicationStatus.pending,
+            ))
+        .toList();
+
+    final today = DateTime.now();
+    final todayKey = DateTime(today.year, today.month, today.day);
+    MedicationStatus? todayOverall;
+    if (medState.todayDoses.isNotEmpty) {
+      final taken = medState.todayDoses.where((d) => d.status == 'taken').length;
+      final missed = medState.todayDoses.where((d) => d.status == 'missed').length;
+      final total = medState.todayDoses.length;
+      if (taken == total) {
+        todayOverall = MedicationStatus.taken;
+      } else if (missed > 0) {
+        todayOverall = MedicationStatus.missed;
+      } else {
+        todayOverall = MedicationStatus.pending;
+      }
+    }
+    final calendarData = todayOverall != null
+        ? {todayKey: todayOverall}
+        : <DateTime, MedicationStatus>{};
+
+    final total = medState.totalCount;
+    final taken = medState.takenCount;
+    final missed =
+        medState.todayDoses.where((d) => d.status == 'missed').length;
+    final adherence = total > 0 ? (taken * 100 ~/ total) : 0;
+
+    return MedicationAdherenceScreen(
+      medications: medications,
+      calendarData: calendarData,
+      adherencePercent: adherence,
+      takenOnTime: taken,
+      takenLate: 0,
+      missed: missed,
+    );
+  }
+}
+
+// ── Auth Gate ─────────────────────────────────────────────────────────────────
+class AuthGate extends ConsumerWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+
+    return authState.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => const S01Welcome(),
+      data: (user) {
+        if (user == null) return const S01Welcome();
+        if (user.role == 'caregiver') return const CaregiverShell();
+        return const Home();
       },
     );
   }

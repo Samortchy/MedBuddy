@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/constants/colors.dart';
 import '/constants/dimens.dart';
 import '/constants/text_styles.dart';
+import '/providers/onboarding_provider.dart';
 import 's07_medications_setup.dart';
 
-class S06Mobility extends StatefulWidget {
+class S06Mobility extends ConsumerStatefulWidget {
   const S06Mobility({super.key});
 
   @override
-  State<S06Mobility> createState() => _S06MobilityState();
+  ConsumerState<S06Mobility> createState() => _S06MobilityState();
 }
 
-class _S06MobilityState extends State<S06Mobility> {
+class _S06MobilityState extends ConsumerState<S06Mobility> {
   String selectedMobility = '';
   String selectedCognition = '';
 
@@ -169,11 +171,17 @@ class _S06MobilityState extends State<S06Mobility> {
                 height: MedBuddyDimens.buttonHeightPrimary,
                 child: ElevatedButton(
                   onPressed: canProceed
-                      ? () => Navigator.push(
+                      ? () {
+                          ref.read(onboardingProvider.notifier).setMobility(
+                                mobilityLevel: selectedMobility,
+                                cognitiveState: selectedCognition,
+                              );
+                          Navigator.push(
                             context,
                             MaterialPageRoute(
                                 builder: (_) => const S07MedicationsSetup()),
-                          )
+                          );
+                        }
                       : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: MedBuddyColors.primary,

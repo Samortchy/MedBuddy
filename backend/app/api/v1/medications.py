@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 from datetime import datetime, timezone
+import logging
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_patient
@@ -8,6 +9,7 @@ from app.models.medication import MedicationCreate, MedicationUpdate
 from app.services.medication_service import generate_doses_for_patient
 
 router = APIRouter(prefix="/medications", tags=["Medications"])
+logger = logging.getLogger(__name__)
 
 
 def _verify_ownership(medication: dict, patient_profile_id: str) -> None:
@@ -47,13 +49,23 @@ async def create_medication(
     current_user: dict = Depends(get_current_patient),
     db: Client = Depends(get_db),
 ):
+    logger.info(f"POST /medications/ name={payload.name} dose={payload.dose_amount}{payload.dose_unit}")
     patient_id = current_user["patient_profile_id"]
+
+    # Infer frequency from schedule count if not explicitly provided
+    schedule_count = len(payload.schedules)
+    frequency = payload.frequency or (
+        "three_times_daily" if schedule_count >= 3
+        else "twice_daily" if schedule_count == 2
+        else "daily"
+    )
 
     insert_data: dict = {
         "patient_id": patient_id,
         "name": payload.name,
         "dose_amount": payload.dose_amount,
         "dose_unit": payload.dose_unit.value,
+        "frequency": frequency,
         "start_date": payload.start_date.isoformat(),
     }
     if payload.form:
@@ -119,6 +131,8 @@ async def update_medication(
         update_data["dose_amount"] = payload.dose_amount
     if payload.dose_unit is not None:
         update_data["dose_unit"] = payload.dose_unit.value
+    if payload.frequency is not None:
+        update_data["frequency"] = payload.frequency
     if payload.form is not None:
         update_data["form"] = payload.form.value
     if payload.instructions is not None:
@@ -141,7 +155,7 @@ async def update_medication(
     if payload.schedules is not None:
         # Replace schedule and delete future pending doses so they regenerate cleanly
         db.table("medication_schedules").delete().eq("medication_id", medication_id).execute()
-        db.table("medication_doses").delete().eq("medication_id", medication_id).eq("status", "pending").execute()
+        db.table("medication_doses").delete().eq("medication_id", medication_id).execute()
 
         if payload.schedules:
             new_schedules = [

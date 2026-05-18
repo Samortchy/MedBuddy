@@ -1,16 +1,16 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../constants/colors.dart';
 import '../../../constants/dimens.dart';
 import '../../../constants/text_styles.dart';
 import '../../../services/service_interfaces.dart';
 import '../../../widgets/shared/sos_button.dart';
 
-/// S-17 — AI Buddy Chat
+/// S-17 â€” AI Buddy Chat
 ///
 /// Backend hooks:
-/// - [aiService]  → AIService (Qwen 2.5 / your LLM backend)
-/// - [sttService] → STTService (Faster-Whisper)
-/// - [ttsService] → TTSService (ElevenLabs / Coqui XTTS-v2)
+/// - [aiService]  â†’ AIService (Qwen 2.5 / your LLM backend)
+/// - [sttService] â†’ STTService (Faster-Whisper)
+/// - [ttsService] â†’ TTSService (ElevenLabs / Coqui XTTS-v2)
 ///
 /// Wire these in when ready. All UI is fully functional without them.
 class AIBuddyChatScreen extends StatefulWidget {
@@ -69,7 +69,7 @@ class _AIBuddyChatScreenState extends State<AIBuddyChatScreen> {
     super.dispose();
   }
 
-  // ── Backend hook: send a text message ──────────────────────────
+  // â”€â”€ Backend hook: send a text message â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> _sendTextMessage(String text) async {
     if (text.trim().isEmpty) return;
     _textController.clear();
@@ -109,7 +109,7 @@ class _AIBuddyChatScreenState extends State<AIBuddyChatScreen> {
     }
   }
 
-  // ── Backend hook: start STT recording ─────────────────────────
+  // â”€â”€ Backend hook: start STT recording â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> _toggleListening() async {
     if (_isListening) {
       setState(() => _isListening = false);
@@ -121,7 +121,7 @@ class _AIBuddyChatScreenState extends State<AIBuddyChatScreen> {
     }
   }
 
-  // ── Backend hook: toggle TTS mute ─────────────────────────────
+  // â”€â”€ Backend hook: toggle TTS mute â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> _toggleMute() async {
     setState(() => _isMuted = !_isMuted);
     // TODO: widget.ttsService?.setMuted(_isMuted);
@@ -159,7 +159,7 @@ class _AIBuddyChatScreenState extends State<AIBuddyChatScreen> {
     );
   }
 
-  // ── App Bar ────────────────────────────────────────────────────
+  // â”€â”€ App Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Widget _buildAppBar() {
     return Container(
       padding: EdgeInsets.only(
@@ -227,7 +227,7 @@ class _AIBuddyChatScreenState extends State<AIBuddyChatScreen> {
     );
   }
 
-  // ── Chat Area ──────────────────────────────────────────────────
+  // â”€â”€ Chat Area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Widget _buildChatArea() {
     return ListView.builder(
       controller: _scrollController,
@@ -330,7 +330,7 @@ class _AIBuddyChatScreenState extends State<AIBuddyChatScreen> {
     );
   }
 
-  // ── Quick Reply Chips ──────────────────────────────────────────
+  // â”€â”€ Quick Reply Chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Widget _buildQuickReplies() {
     return Container(
       color: MedBuddyColors.warmWhite,
@@ -351,7 +351,7 @@ class _AIBuddyChatScreenState extends State<AIBuddyChatScreen> {
     );
   }
 
-  // ── Input Bar ──────────────────────────────────────────────────
+  // â”€â”€ Input Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Widget _buildInputBar() {
     return Container(
       padding: EdgeInsets.only(
@@ -424,7 +424,7 @@ class _AIBuddyChatScreenState extends State<AIBuddyChatScreen> {
   }
 }
 
-// ── Subwidgets ─────────────────────────────────────────────────────
+// â”€â”€ Subwidgets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _TypingDots extends StatefulWidget {
   const _TypingDots();
@@ -455,7 +455,7 @@ class _TypingDotsState extends State<_TypingDots>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _controller,
-      builder: (_, __) {
+      builder: (context, _) {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(3, (i) {

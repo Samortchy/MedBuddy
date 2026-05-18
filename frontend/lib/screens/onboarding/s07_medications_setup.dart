@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/constants/colors.dart';
 import '/constants/dimens.dart';
 import '/constants/text_styles.dart';
+import '/providers/onboarding_provider.dart';
 import 's08_emergency_contacts.dart';
 
-class S07MedicationsSetup extends StatefulWidget {
+class S07MedicationsSetup extends ConsumerStatefulWidget {
   const S07MedicationsSetup({super.key});
 
   @override
-  State<S07MedicationsSetup> createState() => _S07MedicationsSetupState();
+  ConsumerState<S07MedicationsSetup> createState() =>
+      _S07MedicationsSetupState();
 }
 
-class _S07MedicationsSetupState extends State<S07MedicationsSetup> {
+class _S07MedicationsSetupState extends ConsumerState<S07MedicationsSetup> {
   final List<Map<String, dynamic>> medications = [];
 
   void _showAddSheet({Map<String, dynamic>? existing, int? index}) {
@@ -331,11 +334,23 @@ class _S07MedicationsSetupState extends State<S07MedicationsSetup> {
                 width: double.infinity,
                 height: MedBuddyDimens.buttonHeightPrimary,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const S08EmergencyContacts()),
-                  ),
+                  onPressed: () {
+                    ref.read(onboardingProvider.notifier).setMedications(
+                          medications
+                              .map((m) => OnboardingMedication(
+                                    name: m['name'] as String,
+                                    dosage: m['dose'] as String,
+                                    frequency: m['frequency'] as String,
+                                    withFood: m['withFood'] as bool,
+                                  ))
+                              .toList(),
+                        );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const S08EmergencyContacts()),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: MedBuddyColors.primary,
                     foregroundColor: MedBuddyColors.pureWhite,

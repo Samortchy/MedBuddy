@@ -9,12 +9,14 @@ class C04PatientDashboard extends StatelessWidget {
   final String patientName;
   final String lastCheckin;
   final String status;
+  final String? patientId;
 
   const C04PatientDashboard({
     super.key,
     required this.patientName,
     required this.lastCheckin,
     required this.status,
+    this.patientId,
   });
 
   Color get statusDotColor {

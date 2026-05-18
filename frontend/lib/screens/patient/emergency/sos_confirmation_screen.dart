@@ -1,17 +1,17 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../constants/colors.dart';
 import '../../../constants/dimens.dart';
 import '../../../constants/text_styles.dart';
 
-/// S-12 — SOS Confirmation Overlay
+/// S-12 â€” SOS Confirmation Overlay
 ///
 /// Full-screen red overlay shown immediately after SOS button tap.
 /// User must hold the confirm button for 3 seconds to trigger SOS.
 /// Cancel dismisses without any action.
 ///
 /// Backend hooks:
-/// - [onSOSConfirmed] → EmergencyService.triggerSOS() — called after 3s hold
-/// - [onCancelled]    → Dismiss overlay, no action taken
+/// - [onSOSConfirmed] â†’ EmergencyService.triggerSOS() â€” called after 3s hold
+/// - [onCancelled]    â†’ Dismiss overlay, no action taken
 ///
 /// Note: This screen is shown as a full-screen route pushed on top of
 /// whatever screen the user is on. Use MaterialPageRoute with
@@ -181,7 +181,7 @@ class _SOSConfirmationScreenState extends State<SOSConfirmationScreen>
                 // Progress ring
                 AnimatedBuilder(
                   animation: _progressAnimation,
-                  builder: (_, __) => SizedBox(
+                  builder: (context, _) => SizedBox(
                     width: 160,
                     height: 160,
                     child: CircularProgressIndicator(
@@ -253,7 +253,7 @@ class _SOSConfirmationScreenState extends State<SOSConfirmationScreen>
         ),
         const SizedBox(height: MedBuddyDimens.spacingMd),
         Text(
-          'Release to cancel · SMS will NOT be sent',
+          'Release to cancel Â· SMS will NOT be sent',
           style: MedBuddyTextStyles.caption
               .copyWith(color: MedBuddyColors.pureWhite.withValues(alpha: 0.6)),
           textAlign: TextAlign.center,

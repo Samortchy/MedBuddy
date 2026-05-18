@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/constants/colors.dart';
 import '/constants/dimens.dart';
 import '/constants/text_styles.dart';
+import '/providers/onboarding_provider.dart';
 import 's05_conditions.dart';
 
-class S04BasicInfo extends StatefulWidget {
+class S04BasicInfo extends ConsumerStatefulWidget {
   const S04BasicInfo({super.key});
 
   @override
-  State<S04BasicInfo> createState() => _S04BasicInfoState();
+  ConsumerState<S04BasicInfo> createState() => _S04BasicInfoState();
 }
 
-class _S04BasicInfoState extends State<S04BasicInfo> {
+class _S04BasicInfoState extends ConsumerState<S04BasicInfo> {
   final _nameController = TextEditingController();
   int selectedAge = 65;
   String selectedGender = '';
@@ -200,11 +202,18 @@ class _S04BasicInfoState extends State<S04BasicInfo> {
                       height: MedBuddyDimens.buttonHeightPrimary,
                       child: ElevatedButton(
                         onPressed: canProceed
-                            ? () => Navigator.push(
+                            ? () {
+                                ref.read(onboardingProvider.notifier).setBasicInfo(
+                                      fullName: _nameController.text.trim(),
+                                      age: selectedAge,
+                                      gender: selectedGender,
+                                    );
+                                Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                       builder: (_) => const S05Conditions()),
-                                )
+                                );
+                              }
                             : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: MedBuddyColors.primary,

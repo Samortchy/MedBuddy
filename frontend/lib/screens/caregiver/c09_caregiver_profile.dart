@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/constants/colors.dart';
+import '/providers/auth_provider.dart';
+import '/providers/caregiver_provider.dart';
 import 'c02_add_patient.dart';
 
-class C09CaregiverProfile extends StatelessWidget {
+class C09CaregiverProfile extends ConsumerWidget {
   const C09CaregiverProfile({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider);
+    final patientsState = ref.watch(caregiverPatientsProvider);
+
+    final email = user?.email ?? '';
+    final initial =
+        email.isNotEmpty ? email[0].toUpperCase() : 'C';
+
     return Scaffold(
       backgroundColor: MedColors.warmWhite,
       appBar: AppBar(
@@ -30,24 +40,21 @@ class C09CaregiverProfile extends StatelessWidget {
             ),
             child: Column(
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 40,
                   backgroundColor: MedColors.primarySoft,
-                  child: Text('B',
-                      style: TextStyle(
+                  child: Text(initial,
+                      style: const TextStyle(
                           fontSize: 32,
                           color: MedColors.primary,
                           fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 12),
-                const Text('Bakr Mohamed',
-                    style: TextStyle(
-                        fontSize: 20,
+                Text(email,
+                    style: const TextStyle(
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: MedColors.slate900)),
-                const SizedBox(height: 4),
-                const Text('bakr@email.com',
-                    style: TextStyle(fontSize: 14, color: MedColors.slate500)),
                 const SizedBox(height: 8),
                 Container(
                   padding:
@@ -79,9 +86,38 @@ class C09CaregiverProfile extends StatelessWidget {
                     letterSpacing: 0.5)),
           ),
 
-          const _LinkedPatientTile(name: 'Hassan Ali', relation: 'Father'),
-          const _LinkedPatientTile(name: 'Fatma Khaled', relation: 'Mother'),
-          const _LinkedPatientTile(name: 'Mohamed Samir', relation: 'Uncle'),
+          ...patientsState.when(
+            loading: () => [
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child:
+                      CircularProgressIndicator(color: MedColors.primary),
+                ),
+              )
+            ],
+            error: (e, _) => [
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text('Could not load patients',
+                    style: TextStyle(
+                        fontSize: 13, color: MedColors.emergency)),
+              )
+            ],
+            data: (patients) => patients.isEmpty
+                ? [
+                    const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Text('No linked patients yet.',
+                          style: TextStyle(
+                              fontSize: 13, color: MedColors.slate500)),
+                    )
+                  ]
+                : patients
+                    .map((p) => _LinkedPatientTile(
+                        name: p.fullName, relation: 'Patient'))
+                    .toList(),
+          ),
 
           const SizedBox(height: 8),
 

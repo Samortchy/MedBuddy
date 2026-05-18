@@ -7,17 +7,7 @@ import '../../../widgets/shared/sos_button.dart';
 import '../../../widgets/shared/bottom_nav_bar.dart';
 
 /// S-26 — Patient Chat (with Caregiver)
-///
-/// Backend hooks:
-/// - [messages]         → List<ChatMessage> from your messaging layer
-/// - [caregiverName]    → String caregiver's display name
-/// - [caregiverInitials]→ String 2-letter initials
-/// - [caregiverRelationship] → String e.g. 'Daughter'
-/// - [isOnline]         → bool caregiver online status
-/// - [onSendText]       → Send a text message
-/// - [onStartVoiceRecord] / [onStopVoiceRecord] → Agora voice message
-/// - [onCallCaregiver]  → Open Agora real-time audio call
-/// - [unreadCount]      → int badge count on chat nav tab
+
 class PatientChatScreen extends StatefulWidget {
   final String caregiverName;
   final String caregiverInitials;
@@ -59,14 +49,14 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
       'from': 'caregiver',
       'type': 'text',
       'content': 'Good morning Dad! Did you take your morning medications? 💊',
-      'time': '9:02 AM'
+      'time': '9:02 AM',
     },
     {
       'from': 'patient',
       'type': 'text',
       'content': 'Yes I took them all! Metformin and the others too.',
       'time': '9:08 AM',
-      'read': true
+      'read': true,
     },
     {
       'from': 'caregiver',
@@ -79,15 +69,15 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
         'mood': 4,
         'pain': 2,
         'sleep': '6 hrs',
-        'meds': true
-      }
+        'meds': true,
+      },
     },
     {
       'from': 'patient',
       'type': 'voice',
       'content': '0:24',
       'time': '9:20 AM',
-      'read': true
+      'read': true,
     },
   ];
 
@@ -149,14 +139,18 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
       decoration: const BoxDecoration(
         color: MedBuddyColors.pureWhite,
         border: Border(
-            bottom: BorderSide(color: MedBuddyColors.slate300, width: 0.5)),
+          bottom: BorderSide(color: MedBuddyColors.slate300, width: 0.5),
+        ),
       ),
       child: Row(
         children: [
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back_ios,
-                color: MedBuddyColors.primary, size: 20),
+            icon: const Icon(
+              Icons.arrow_back_ios,
+              color: MedBuddyColors.primary,
+              size: 20,
+            ),
           ),
           Stack(
             children: [
@@ -168,9 +162,12 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
                   shape: BoxShape.circle,
                 ),
                 child: Center(
-                  child: Text(widget.caregiverInitials,
-                      style: MedBuddyTextStyles.bodyBold
-                          .copyWith(color: MedBuddyColors.pureWhite)),
+                  child: Text(
+                    widget.caregiverInitials,
+                    style: MedBuddyTextStyles.bodyBold.copyWith(
+                      color: MedBuddyColors.pureWhite,
+                    ),
+                  ),
                 ),
               ),
               if (widget.isOnline)
@@ -183,8 +180,10 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
                     decoration: BoxDecoration(
                       color: MedBuddyColors.success,
                       shape: BoxShape.circle,
-                      border:
-                          Border.all(color: MedBuddyColors.pureWhite, width: 2),
+                      border: Border.all(
+                        color: MedBuddyColors.pureWhite,
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
@@ -197,8 +196,9 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
               children: [
                 Text(widget.caregiverName, style: MedBuddyTextStyles.bodyBold),
                 Text(
-                    '${widget.caregiverRelationship} · ${widget.isOnline ? "Online" : "Offline"}',
-                    style: MedBuddyTextStyles.caption),
+                  '${widget.caregiverRelationship} · ${widget.isOnline ? "Online" : "Offline"}',
+                  style: MedBuddyTextStyles.caption,
+                ),
               ],
             ),
           ),
@@ -211,8 +211,11 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
                 color: MedBuddyColors.primarySoft,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.phone_outlined,
-                  color: MedBuddyColors.primary, size: 18),
+              child: const Icon(
+                Icons.phone_outlined,
+                color: MedBuddyColors.primary,
+                size: 18,
+              ),
             ),
           ),
         ],
@@ -257,22 +260,27 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: MedBuddyDimens.spacingMd),
       child: Column(
-        crossAxisAlignment:
-            isPatient ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isPatient
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           if (type == 'text') _textBubble(msg, isPatient),
           if (type == 'voice') _voiceBubble(msg, isPatient),
           if (type == 'healthReport') _healthReportCard(msg),
           const SizedBox(height: 4),
           Row(
-            mainAxisAlignment:
-                isPatient ? MainAxisAlignment.end : MainAxisAlignment.start,
+            mainAxisAlignment: isPatient
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
             children: [
               Text(msg['time'] as String, style: MedBuddyTextStyles.caption),
               if (isPatient && (msg['read'] ?? false)) ...[
                 const SizedBox(width: 4),
-                const Icon(Icons.done_all,
-                    color: MedBuddyColors.primary, size: 14),
+                const Icon(
+                  Icons.done_all,
+                  color: MedBuddyColors.primary,
+                  size: 14,
+                ),
               ],
             ],
           ),
@@ -297,9 +305,10 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
             ? Border.all(color: MedBuddyColors.primaryLight, width: 1.5)
             : null,
       ),
-      child: Text(msg['content'] as String,
-          style:
-              MedBuddyTextStyles.body.copyWith(color: MedBuddyColors.slate700)),
+      child: Text(
+        msg['content'] as String,
+        style: MedBuddyTextStyles.body.copyWith(color: MedBuddyColors.slate700),
+      ),
     );
   }
 
@@ -325,9 +334,14 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
             width: 34,
             height: 34,
             decoration: const BoxDecoration(
-                color: MedBuddyColors.primary, shape: BoxShape.circle),
-            child: const Icon(Icons.play_arrow,
-                color: MedBuddyColors.pureWhite, size: 18),
+              color: MedBuddyColors.primary,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.play_arrow,
+              color: MedBuddyColors.pureWhite,
+              size: 18,
+            ),
           ),
           const SizedBox(width: MedBuddyDimens.spacingMd),
           Expanded(
@@ -336,33 +350,38 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
               children: [
                 // Waveform bars
                 Row(
-                  children: [
-                    8.0,
-                    14.0,
-                    20.0,
-                    12.0,
-                    18.0,
-                    10.0,
-                    8.0,
-                    14.0,
-                    10.0,
-                    6.0,
-                    12.0
-                  ]
-                      .map((h) => Container(
-                            width: 3,
-                            height: h,
-                            margin: const EdgeInsets.symmetric(horizontal: 1),
-                            decoration: BoxDecoration(
-                              color: MedBuddyColors.primary,
-                              borderRadius: BorderRadius.circular(2),
+                  children:
+                      [
+                            8.0,
+                            14.0,
+                            20.0,
+                            12.0,
+                            18.0,
+                            10.0,
+                            8.0,
+                            14.0,
+                            10.0,
+                            6.0,
+                            12.0,
+                          ]
+                          .map(
+                            (h) => Container(
+                              width: 3,
+                              height: h,
+                              margin: const EdgeInsets.symmetric(horizontal: 1),
+                              decoration: BoxDecoration(
+                                color: MedBuddyColors.primary,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
                             ),
-                          ))
-                      .toList(),
+                          )
+                          .toList(),
                 ),
                 const SizedBox(height: 4),
-                Text(msg['content'] as String,
-                    style: MedBuddyTextStyles.caption),
+                Text(
+                  msg['content'] as String,
+                  style: MedBuddyTextStyles.caption,
+                ),
               ],
             ),
           ),
@@ -386,27 +405,40 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.show_chart,
-                  color: MedBuddyColors.primary, size: 16),
+              const Icon(
+                Icons.show_chart,
+                color: MedBuddyColors.primary,
+                size: 16,
+              ),
               const SizedBox(width: 6),
               Expanded(
-                child: Text(report['title'] as String,
-                    style: MedBuddyTextStyles.label.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: MedBuddyColors.primaryDark)),
+                child: Text(
+                  report['title'] as String,
+                  style: MedBuddyTextStyles.label.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: MedBuddyColors.primaryDark,
+                  ),
+                ),
               ),
             ],
           ),
           const Divider(color: MedBuddyColors.primaryLight, height: 16),
           _reportRow('Mood', '${report['mood']}/5', MedBuddyColors.slate700),
-          _reportRow('Pain level', '${report['pain']}/10 — Low',
-              MedBuddyColors.success),
           _reportRow(
-              'Sleep', report['sleep'] as String, MedBuddyColors.warning),
+            'Pain level',
+            '${report['pain']}/10 — Low',
+            MedBuddyColors.success,
+          ),
           _reportRow(
-              'Medications',
-              (report['meds'] as bool) ? 'All taken' : 'Missed',
-              MedBuddyColors.success),
+            'Sleep',
+            report['sleep'] as String,
+            MedBuddyColors.warning,
+          ),
+          _reportRow(
+            'Medications',
+            (report['meds'] as bool) ? 'All taken' : 'Missed',
+            MedBuddyColors.success,
+          ),
         ],
       ),
     );
@@ -419,9 +451,13 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: MedBuddyTextStyles.caption),
-          Text(value,
-              style: MedBuddyTextStyles.caption
-                  .copyWith(color: valueColor, fontWeight: FontWeight.w600)),
+          Text(
+            value,
+            style: MedBuddyTextStyles.caption.copyWith(
+              color: valueColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -437,8 +473,9 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
       ),
       decoration: const BoxDecoration(
         color: MedBuddyColors.pureWhite,
-        border:
-            Border(top: BorderSide(color: MedBuddyColors.slate300, width: 0.5)),
+        border: Border(
+          top: BorderSide(color: MedBuddyColors.slate300, width: 0.5),
+        ),
       ),
       child: Row(
         children: [
@@ -455,11 +492,14 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
                 shape: BoxShape.circle,
               ),
               child: const Center(
-                child: Text('SOS',
-                    style: TextStyle(
-                        color: MedBuddyColors.pureWhite,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700)),
+                child: Text(
+                  'SOS',
+                  style: TextStyle(
+                    color: MedBuddyColors.pureWhite,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
           ),
@@ -477,8 +517,9 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
                 style: MedBuddyTextStyles.body,
                 decoration: InputDecoration(
                   hintText: 'Type a message...',
-                  hintStyle: MedBuddyTextStyles.body
-                      .copyWith(color: MedBuddyColors.slate500),
+                  hintStyle: MedBuddyTextStyles.body.copyWith(
+                    color: MedBuddyColors.slate500,
+                  ),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
@@ -515,14 +556,16 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
   // Convert ChatMessage model list to display map list
   List<Map<String, dynamic>> _toMapList(List<ChatMessage> msgs) {
     return msgs
-        .map((m) => {
-              'from': m.isFromAI ? 'caregiver' : 'patient',
-              'type': m.type == MessageType.voice ? 'voice' : 'text',
-              'content': m.content,
-              'time':
-                  '${m.timestamp.hour}:${m.timestamp.minute.toString().padLeft(2, '0')}',
-              'read': true,
-            })
+        .map(
+          (m) => {
+            'from': m.isFromAI ? 'caregiver' : 'patient',
+            'type': m.type == MessageType.voice ? 'voice' : 'text',
+            'content': m.content,
+            'time':
+                '${m.timestamp.hour}:${m.timestamp.minute.toString().padLeft(2, '0')}',
+            'read': true,
+          },
+        )
         .toList();
   }
 }

@@ -6,12 +6,7 @@ import '../../../services/service_interfaces.dart';
 import '../../../widgets/shared/sos_button.dart';
 import '../../../widgets/shared/bottom_nav_bar.dart';
 
-/// S-28 — Symptom Log (Phase 5 Shell)
-///
-/// Backend hooks:
-/// - [entries]       → List<SymptomEntry> from your data layer
-/// - [onAddEntry]    → Called with text description to save a new entry
-/// - [onVoiceRecord] → Called to start voice-based entry (Phase 5 full)
+/// S-28 — Symptom Log
 /// - [onExport]      → Export symptom timeline as report
 class SymptomLogScreen extends StatefulWidget {
   final List<SymptomEntry> entries;

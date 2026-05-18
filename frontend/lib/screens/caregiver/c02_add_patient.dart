@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/constants/colors.dart';
+import '/providers/caregiver_provider.dart';
 
-class C02AddPatient extends StatefulWidget {
+class C02AddPatient extends ConsumerStatefulWidget {
   const C02AddPatient({super.key});
 
   @override
-  State<C02AddPatient> createState() => _C02AddPatientState();
+  ConsumerState<C02AddPatient> createState() => _C02AddPatientState();
 }
 
-class _C02AddPatientState extends State<C02AddPatient> {
+class _C02AddPatientState extends ConsumerState<C02AddPatient> {
   final List<String> code = ['', '', '', '', '', ''];
   int currentIndex = 0;
+  bool _isLoading = false;
+  String? _error;
 
   void _onKeyPress(String digit) {
     if (currentIndex < 6) {
@@ -120,7 +124,26 @@ class _C02AddPatientState extends State<C02AddPatient> {
             const SizedBox(height: 24),
 
             ElevatedButton(
-              onPressed: currentIndex == 6 ? () {} : null,
+              onPressed: currentIndex == 6 && !_isLoading
+                  ? () async {
+                      setState(() {
+                        _isLoading = true;
+                        _error = null;
+                      });
+                      final nav = Navigator.of(context);
+                      try {
+                        await ref
+                            .read(caregiverPatientsProvider.notifier)
+                            .acceptInvite(code.join());
+                        if (mounted) nav.pop();
+                      } catch (e) {
+                        setState(() {
+                          _isLoading = false;
+                          _error = e.toString();
+                        });
+                      }
+                    }
+                  : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: MedColors.primary,
                 disabledBackgroundColor: MedColors.slate300,
@@ -128,12 +151,28 @@ class _C02AddPatientState extends State<C02AddPatient> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text('Send Request',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white)),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.5, color: Colors.white),
+                    )
+                  : const Text('Send Request',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white)),
             ),
+
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13, color: MedColors.emergency),
+              ),
+            ],
 
             const SizedBox(height: 16),
             const Text(

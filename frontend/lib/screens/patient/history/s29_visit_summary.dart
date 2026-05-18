@@ -1,82 +1,108 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../constants/colors.dart';
 import '../../../constants/dimens.dart';
 import '../../../constants/text_styles.dart';
+import '../../../services/api_service.dart';
 import '../../../widgets/shared/sos_button.dart';
 
-/// S-29 — Visit Summary Recorder (Phase 5 Shell)
-///
-/// Backend hooks:
-/// - [existingSummary]  → VisitSummary? if a previous summary exists
-/// - [onStartRecording] → Start audio recording (wire to Faster-Whisper STT)
-/// - [onStopRecording]  → Stop recording and send to AI for structuring
-/// - [onShare]          → Share/export the AI-structured summary as PDF
-class VisitSummaryScreen extends StatefulWidget {
-  final VisitSummary? existingSummary;
-  final VoidCallback? onStartRecording;
-  final VoidCallback? onStopRecording;
-  final VoidCallback? onShare;
+// ── Provider ──────────────────────────────────────────────────────────────────
 
-  const VisitSummaryScreen({
-    super.key,
-    this.existingSummary,
-    this.onStartRecording,
-    this.onStopRecording,
-    this.onShare,
-  });
+class _VisitSummaryNotifier
+    extends StateNotifier<AsyncValue<List<VisitSummary>>> {
+  final Dio _dio;
 
-  @override
-  State<VisitSummaryScreen> createState() => _VisitSummaryScreenState();
-}
-
-class _VisitSummaryScreenState extends State<VisitSummaryScreen>
-    with SingleTickerProviderStateMixin {
-  bool _isRecording = false;
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
-  // Placeholder summary — remove when real data is wired via widget.existingSummary
-  final VisitSummary _placeholderSummary = const VisitSummary(
-    date: 'Apr 3, 2026',
-    diagnosis: 'Type 2 Diabetes — stable. Blood pressure slightly elevated.',
-    medicationsChanged: 'Lisinopril increased from 10mg to 20mg daily.',
-    instructions:
-        'Reduce salt intake. Walk 20 minutes daily. Monitor BP at home.',
-    nextAppointment: 'May 3, 2026 — Dr. Karim, 10:00 AM',
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
-    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.1).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
+  _VisitSummaryNotifier(this._dio) : super(const AsyncValue.loading()) {
+    fetch();
   }
 
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  void _toggleRecording() {
-    if (_isRecording) {
-      setState(() => _isRecording = false);
-      widget.onStopRecording?.call();
-    } else {
-      setState(() => _isRecording = true);
-      widget.onStartRecording?.call();
+  Future<void> fetch() async {
+    state = const AsyncValue.loading();
+    try {
+      final response = await _dio.get('/visit-summaries/');
+      final list = response.data as List<dynamic>? ?? [];
+      final summaries = list
+          .map((e) => VisitSummary.fromJson(e as Map<String, dynamic>))
+          .toList();
+      state = AsyncValue.data(summaries);
+    } on DioException catch (e) {
+      state = AsyncValue.error(
+        e.response?.data?['detail'] ?? e.message ?? 'Failed to load',
+        e.stackTrace,
+      );
+    } catch (e) {
+      state = AsyncValue.error(e.toString(), StackTrace.current);
     }
   }
 
-  VisitSummary? get _summary => widget.existingSummary ?? _placeholderSummary;
+  Future<void> add({
+    required String rawTranscript,
+    String? diagnosis,
+    String? medicationsChanged,
+    String? instructions,
+  }) async {
+    final body = <String, dynamic>{'raw_transcript': rawTranscript};
+    if (diagnosis != null) body['diagnosis'] = diagnosis;
+    if (medicationsChanged != null) body['medications_changed'] = medicationsChanged;
+    if (instructions != null) body['instructions'] = instructions;
+    await _dio.post('/visit-summaries/', data: body);
+    await fetch();
+  }
+}
+
+final _visitSummaryProvider = StateNotifierProvider<_VisitSummaryNotifier,
+    AsyncValue<List<VisitSummary>>>(
+  (ref) => _VisitSummaryNotifier(ref.watch(apiServiceProvider)),
+);
+
+// ── Screen ────────────────────────────────────────────────────────────────────
+
+class VisitSummaryScreen extends ConsumerStatefulWidget {
+  const VisitSummaryScreen({super.key});
+
+  @override
+  ConsumerState<VisitSummaryScreen> createState() => _VisitSummaryScreenState();
+}
+
+class _VisitSummaryScreenState extends ConsumerState<VisitSummaryScreen> {
+  final _notesCtrl = TextEditingController();
+  bool _isSaving = false;
+  String? _saveError;
+
+  @override
+  void dispose() {
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final text = _notesCtrl.text.trim();
+    if (text.isEmpty) return;
+    setState(() {
+      _isSaving = true;
+      _saveError = null;
+    });
+    try {
+      await ref.read(_visitSummaryProvider.notifier).add(rawTranscript: text);
+      if (mounted) {
+        _notesCtrl.clear();
+        setState(() => _isSaving = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _saveError = e.toString();
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final summariesState = ref.watch(_visitSummaryProvider);
+
     return Scaffold(
       backgroundColor: MedBuddyColors.warmWhite,
       body: Stack(
@@ -85,25 +111,66 @@ class _VisitSummaryScreenState extends State<VisitSummaryScreen>
             children: [
               _buildAppBar(),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(
-                    left: MedBuddyDimens.spacingLg,
-                    right: MedBuddyDimens.spacingLg,
-                    top: MedBuddyDimens.spacingXl,
-                    bottom: MedBuddyDimens.bottomNavHeight +
-                        MedBuddyDimens.sosBottomOffset,
+                child: summariesState.when(
+                  loading: () => const Center(
+                    child:
+                        CircularProgressIndicator(color: MedBuddyColors.primary),
                   ),
-                  child: Column(
+                  error: (e, _) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(MedBuddyDimens.spacingLg),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(e.toString(),
+                              textAlign: TextAlign.center,
+                              style: MedBuddyTextStyles.body.copyWith(
+                                  color: MedBuddyColors.emergency)),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: () => ref
+                                .read(_visitSummaryProvider.notifier)
+                                .fetch(),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  data: (summaries) => ListView(
+                    padding: const EdgeInsets.only(
+                      left: MedBuddyDimens.spacingLg,
+                      right: MedBuddyDimens.spacingLg,
+                      top: MedBuddyDimens.spacingXl,
+                      bottom: MedBuddyDimens.bottomNavHeight +
+                          MedBuddyDimens.sosBottomOffset,
+                    ),
                     children: [
-                      _buildInstruction(),
-                      const SizedBox(height: MedBuddyDimens.spacingXl),
-                      _buildHeroRecordButton(),
-                      const SizedBox(height: MedBuddyDimens.spacingXl),
-                      _buildPlaybackSection(),
-                      const SizedBox(height: MedBuddyDimens.spacingXl),
-                      if (_summary != null) _buildSummaryCard(_summary!),
-                      const SizedBox(height: MedBuddyDimens.spacingXl),
-                      _buildShareButton(),
+                      _buildNewNoteSection(),
+                      if (summaries.isNotEmpty) ...[
+                        const SizedBox(height: MedBuddyDimens.spacingXl),
+                        Text(
+                          'Previous Summaries',
+                          style: MedBuddyTextStyles.bodyBold.copyWith(
+                              color: MedBuddyColors.slate700),
+                        ),
+                        const SizedBox(height: MedBuddyDimens.spacingMd),
+                        ...summaries.map((s) => Padding(
+                              padding: const EdgeInsets.only(
+                                  bottom: MedBuddyDimens.spacingMd),
+                              child: _buildSummaryCard(s),
+                            )),
+                      ] else ...[
+                        const SizedBox(height: MedBuddyDimens.spacingXl),
+                        Center(
+                          child: Text(
+                            'No visit summaries yet.\nAdd your first note above.',
+                            textAlign: TextAlign.center,
+                            style: MedBuddyTextStyles.body
+                                .copyWith(color: MedBuddyColors.slate500),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -146,154 +213,85 @@ class _VisitSummaryScreenState extends State<VisitSummaryScreen>
     );
   }
 
-  Widget _buildInstruction() {
-    return Text(
-      'After your appointment, tap record and describe what happened. '
-      'MedBuddy will organise it for you.',
-      style: MedBuddyTextStyles.body.copyWith(color: MedBuddyColors.slate500),
-      textAlign: TextAlign.center,
-    );
-  }
-
-  Widget _buildHeroRecordButton() {
-    return Column(
-      children: [
-        ScaleTransition(
-          scale: _isRecording
-              ? _pulseAnimation
-              : const AlwaysStoppedAnimation(1.0),
-          child: Stack(
-            alignment: Alignment.center,
+  Widget _buildNewNoteSection() {
+    return Container(
+      padding: const EdgeInsets.all(MedBuddyDimens.spacingMd),
+      decoration: BoxDecoration(
+        color: MedBuddyColors.pureWhite,
+        borderRadius: BorderRadius.circular(MedBuddyDimens.radiusLg),
+        border: Border.all(color: MedBuddyColors.slate300, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              if (_isRecording) ...[
-                Container(
-                  width: 110,
-                  height: 110,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                        color: MedBuddyColors.primaryLight, width: 2),
-                  ),
-                ),
-                Container(
-                  width: 90,
-                  height: 90,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border:
-                        Border.all(color: MedBuddyColors.primaryMid, width: 2),
-                  ),
-                ),
-              ],
-              GestureDetector(
-                onTap: _toggleRecording,
-                child: Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: _isRecording
-                        ? MedBuddyColors.emergency
-                        : MedBuddyColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    _isRecording ? Icons.stop : Icons.mic_none,
-                    color: MedBuddyColors.pureWhite,
-                    size: 32,
-                  ),
-                ),
-              ),
+              const Icon(Icons.note_add_outlined,
+                  color: MedBuddyColors.primary, size: 18),
+              const SizedBox(width: 8),
+              Text('New Visit Note',
+                  style: MedBuddyTextStyles.bodyBold
+                      .copyWith(color: MedBuddyColors.primaryDark)),
             ],
           ),
-        ),
-        const SizedBox(height: MedBuddyDimens.spacingMd),
-        Text(
-          _isRecording ? 'Recording... tap to stop' : 'Tap to Record',
-          style: MedBuddyTextStyles.body.copyWith(
-            color: _isRecording
-                ? MedBuddyColors.emergency
-                : MedBuddyColors.primary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPlaybackSection() {
-    final hasRecording = _summary != null;
-    return Opacity(
-      opacity: hasRecording ? 1.0 : 0.4,
-      child: Container(
-        padding: const EdgeInsets.all(MedBuddyDimens.spacingMd),
-        decoration: BoxDecoration(
-          color: MedBuddyColors.pureWhite,
-          borderRadius: BorderRadius.circular(MedBuddyDimens.radiusLg),
-          border: Border.all(color: MedBuddyColors.slate300, width: 0.5),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            if (!hasRecording)
-              const Text('Record a visit first',
-                  style: MedBuddyTextStyles.caption,
-                  textAlign: TextAlign.center),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: hasRecording
-                        ? MedBuddyColors.primary
-                        : MedBuddyColors.slate100,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.play_arrow,
-                      color: hasRecording
-                          ? MedBuddyColors.pureWhite
-                          : MedBuddyColors.slate300,
-                      size: 18),
-                ),
-                const SizedBox(width: MedBuddyDimens.spacingMd),
-                Expanded(
-                  child: Row(
-                    children: [
-                      8.0,
-                      14.0,
-                      20.0,
-                      12.0,
-                      18.0,
-                      10.0,
-                      8.0,
-                      14.0,
-                      10.0,
-                      6.0,
-                      12.0
-                    ]
-                        .map((h) => Container(
-                              width: 3,
-                              height: h,
-                              margin: const EdgeInsets.symmetric(horizontal: 1),
-                              decoration: BoxDecoration(
-                                color: hasRecording
-                                    ? MedBuddyColors.primary
-                                    : MedBuddyColors.slate300,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                ),
-                const SizedBox(width: MedBuddyDimens.spacingMd),
-                Text(hasRecording ? '1:32' : '0:00',
-                    style: MedBuddyTextStyles.label
-                        .copyWith(color: MedBuddyColors.slate500)),
-              ],
+          const SizedBox(height: MedBuddyDimens.spacingMd),
+          TextField(
+            controller: _notesCtrl,
+            maxLines: 6,
+            style:
+                MedBuddyTextStyles.body.copyWith(color: MedBuddyColors.slate900),
+            decoration: InputDecoration(
+              hintText:
+                  'Describe your visit — diagnosis, medication changes, doctor instructions, next appointment…',
+              hintStyle: MedBuddyTextStyles.body
+                  .copyWith(color: MedBuddyColors.slate500),
+              filled: true,
+              fillColor: MedBuddyColors.slate100,
+              contentPadding: const EdgeInsets.all(MedBuddyDimens.spacingMd),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(MedBuddyDimens.radiusMd),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(MedBuddyDimens.radiusMd),
+                borderSide: const BorderSide(
+                    color: MedBuddyColors.primaryMid, width: 1.5),
+              ),
             ),
+          ),
+          if (_saveError != null) ...[
+            const SizedBox(height: MedBuddyDimens.spacingSm),
+            Text(_saveError!,
+                style: MedBuddyTextStyles.caption
+                    .copyWith(color: MedBuddyColors.emergency)),
           ],
-        ),
+          const SizedBox(height: MedBuddyDimens.spacingMd),
+          SizedBox(
+            width: double.infinity,
+            height: MedBuddyDimens.buttonHeightPrimary,
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _save,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: MedBuddyColors.primary,
+                disabledBackgroundColor: MedBuddyColors.slate300,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(MedBuddyDimens.radiusMd)),
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.5, color: Colors.white),
+                    )
+                  : Text('Save Note',
+                      style: MedBuddyTextStyles.bodyBold
+                          .copyWith(color: MedBuddyColors.pureWhite)),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -311,21 +309,32 @@ class _VisitSummaryScreenState extends State<VisitSummaryScreen>
         children: [
           Row(
             children: [
-              const Icon(Icons.auto_awesome_outlined,
+              const Icon(Icons.description_outlined,
                   color: MedBuddyColors.primary, size: 16),
               const SizedBox(width: 8),
-              Text('Visit Summary — ${summary.date}',
+              Text('Visit — ${summary.date}',
                   style: MedBuddyTextStyles.label.copyWith(
                       fontWeight: FontWeight.w700,
                       color: MedBuddyColors.primaryDark)),
             ],
           ),
           const Divider(color: MedBuddyColors.primaryLight, height: 16),
-          _summaryField('DIAGNOSIS', summary.diagnosis),
-          _summaryField('MEDICATIONS CHANGED', summary.medicationsChanged),
-          _summaryField("DOCTOR'S INSTRUCTIONS", summary.instructions),
-          _summaryField('NEXT APPOINTMENT', summary.nextAppointment,
-              isLast: true),
+          if (summary.diagnosis.isNotEmpty)
+            _summaryField('NOTES', summary.diagnosis),
+          if (summary.medicationsChanged.isNotEmpty)
+            _summaryField('MEDICATIONS CHANGED', summary.medicationsChanged),
+          if (summary.instructions.isNotEmpty)
+            _summaryField("INSTRUCTIONS", summary.instructions),
+          if (summary.nextAppointment.isNotEmpty)
+            _summaryField('NEXT APPOINTMENT', summary.nextAppointment,
+                isLast: true),
+          if (summary.diagnosis.isEmpty &&
+              summary.medicationsChanged.isEmpty &&
+              summary.instructions.isEmpty &&
+              summary.nextAppointment.isEmpty)
+            Text('(no details recorded)',
+                style: MedBuddyTextStyles.caption
+                    .copyWith(color: MedBuddyColors.slate500)),
         ],
       ),
     );
@@ -346,36 +355,12 @@ class _VisitSummaryScreenState extends State<VisitSummaryScreen>
       ),
     );
   }
-
-  Widget _buildShareButton() {
-    return GestureDetector(
-      onTap: widget.onShare,
-      child: Container(
-        height: MedBuddyDimens.buttonHeightPrimary,
-        decoration: BoxDecoration(
-          border: Border.all(color: MedBuddyColors.primary, width: 1.5),
-          borderRadius: BorderRadius.circular(MedBuddyDimens.radiusMd),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.share_outlined,
-                color: MedBuddyColors.primary, size: 18),
-            const SizedBox(width: MedBuddyDimens.spacingMd),
-            Text('Share Summary',
-                style: MedBuddyTextStyles.body.copyWith(
-                    color: MedBuddyColors.primary,
-                    fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
-/// Data model for a visit summary.
-/// Move to service_interfaces.dart if you need it shared across screens.
+// ── Data model ────────────────────────────────────────────────────────────────
+
 class VisitSummary {
+  final String id;
   final String date;
   final String diagnosis;
   final String medicationsChanged;
@@ -383,10 +368,50 @@ class VisitSummary {
   final String nextAppointment;
 
   const VisitSummary({
+    required this.id,
     required this.date,
     required this.diagnosis,
     required this.medicationsChanged,
     required this.instructions,
     required this.nextAppointment,
   });
+
+  factory VisitSummary.fromJson(Map<String, dynamic> json) {
+    final recordedAt = json['recorded_at'] as String? ?? '';
+    final date = recordedAt.isEmpty ? 'Unknown date' : _formatDate(recordedAt);
+    final transcript = json['raw_transcript'] as String? ?? '';
+    final diagnosisRaw = json['diagnosis'] as String? ?? '';
+    return VisitSummary(
+      id: json['id'] as String? ?? '',
+      date: date,
+      diagnosis: diagnosisRaw.isNotEmpty ? diagnosisRaw : transcript,
+      medicationsChanged: json['medications_changed'] as String? ?? '',
+      instructions: json['instructions'] as String? ?? '',
+      nextAppointment: json['next_appointment'] as String? ?? '',
+    );
+  }
+
+  static String _formatDate(String iso) {
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      const months = [
+        '',
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
+      ];
+      return '${months[dt.month]} ${dt.day}, ${dt.year}';
+    } catch (_) {
+      return iso;
+    }
+  }
 }

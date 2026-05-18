@@ -7,10 +7,6 @@ import '../../../widgets/shared/sos_button.dart';
 import '../../../widgets/shared/bottom_nav_bar.dart';
 
 /// S-24 — Emergency Event Log
-///
-/// Backend hooks:
-/// - [events]    → List<EmergencyEvent> from your data layer
-/// - [onExport]  → Generate PDF report
 class EmergencyEventLogScreen extends StatelessWidget {
   final List<EmergencyEvent> events;
   final VoidCallback? onExport;

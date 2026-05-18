@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/constants/colors.dart';
+import '/providers/auth_provider.dart';
 import 'c09_caregiver_profile.dart';
 
-class C11Settings extends StatefulWidget {
+class C11Settings extends ConsumerStatefulWidget {
   const C11Settings({super.key});
 
   @override
-  State<C11Settings> createState() => _C11SettingsState();
+  ConsumerState<C11Settings> createState() => _C11SettingsState();
 }
 
-class _C11SettingsState extends State<C11Settings> {
+class _C11SettingsState extends ConsumerState<C11Settings> {
   bool emergencyAlarm = true;
   bool vibration = true;
   bool lowPriorityAlerts = false;
@@ -96,11 +98,14 @@ class _C11SettingsState extends State<C11Settings> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  '/welcome',
-                  (route) => false,
-                );
+              onPressed: () async {
+                await ref.read(authProvider.notifier).signOut();
+                if (context.mounted) {
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    '/welcome',
+                    (route) => false,
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: MedColors.emergencyLight,
