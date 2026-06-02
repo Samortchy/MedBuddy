@@ -1,6 +1,6 @@
 """
-escalation_worker.py  (Task #26 — missed-dose escalation)
-----------------------------------------------------------
+escalation_worker.py
+---------------------
 Cron job that runs every 30 minutes.
 
 For every scheduled dose that:
@@ -26,52 +26,42 @@ from app.services.notification_service import notify_caregivers
 logger = logging.getLogger(__name__)
 
 
-async def _acquire_db() -> Any:
-    candidate = get_db()
-    if hasattr(candidate, "__anext__"):
-        return await candidate.__anext__()
-    return candidate
-
-
 async def escalate_missed_doses() -> None:
     """Entry point registered with APScheduler — runs every 30 minutes."""
     now_utc: datetime = datetime.now(timezone.utc)
 
     logger.debug("escalation_worker: running at %s", now_utc.isoformat())
 
-    try:
-        db = await _acquire_db()
-    except Exception as e:  # noqa: BLE001
-        logger.exception("escalation_worker: failed to acquire db: %s", e)
-        return
+    db = get_db()
 
     lookback_cutoff = (now_utc - timedelta(hours=24)).isoformat()
-    overdue_result = await (
+
+    overdue_result = (
         db.table("medication_doses")
         .select(
             "id, scheduled_at, medication_id, patient_id, "
-            "medications(name, dosage_amount, dosage_unit), "
-            "patient_profiles(medication_grace_mins)"
+            "medications(name, dosage_amount, dosage_unit)"
         )
         .lt("scheduled_at", now_utc.isoformat())
         .gte("scheduled_at", lookback_cutoff)
         .execute()
     )
 
-    all_overdue = getattr(overdue_result, "data", None) or []
+    all_overdue = (overdue_result.data or []) if overdue_result else []
     if not all_overdue:
         logger.debug("escalation_worker: no overdue doses found")
         return
 
     overdue_ids = [row["id"] for row in all_overdue]
-    logged_result = await (
+    logged_result = (
         db.table("dose_logs")
         .select("dose_id")
         .in_("dose_id", overdue_ids)
         .execute()
     )
     already_logged: set[str] = {
-        row["dose_id"] for row in (getattr(logged_result, "data", None) or [])
+        row["dose_id"]
+        for row in ((logged_result.data or []) if logged_result else [])
     }
 
     missed_count = 0
@@ -88,8 +78,8 @@ async def escalate_missed_doses() -> None:
         dosage_amount = medication.get("dosage_amount", "")
         dosage_unit: str = medication.get("dosage_unit", "")
 
-        profile: dict = dose.get("patient_profiles") or {}
-        grace_mins: int = profile.get("medication_grace_mins", 30)
+        # Fetch grace_mins separately (no patient_id column on patient_profiles)
+        grace_mins = _get_grace_mins(db, patient_id)
 
         try:
             scheduled_at = datetime.fromisoformat(
@@ -98,8 +88,7 @@ async def escalate_missed_doses() -> None:
         except ValueError:
             logger.warning(
                 "Cannot parse scheduled_at='%s' for dose=%s",
-                scheduled_at_str,
-                dose_id,
+                scheduled_at_str, dose_id,
             )
             continue
 
@@ -108,34 +97,22 @@ async def escalate_missed_doses() -> None:
             continue
 
         logger.info(
-            "Marking dose=%s as missed (patient=%s, med=%s, elapsed=%.1f min, "
-            "grace=%d min)",
-            dose_id,
-            patient_id,
-            med_name,
-            elapsed_mins,
-            grace_mins,
+            "Marking dose=%s as missed (patient=%s, med=%s, elapsed=%.1f min, grace=%d min)",
+            dose_id, patient_id, med_name, elapsed_mins, grace_mins,
         )
 
         try:
-            await (
-                db.table("dose_logs")
-                .insert(
-                    {
-                        "dose_id": dose_id,
-                        "patient_id": patient_id,
-                        "status": "missed",
-                        "logged_at": now_utc.isoformat(),
-                    },
-                    upsert=False,
-                )
-                .execute()
-            )
+            db.table("dose_logs").insert(
+                {
+                    "dose_id": dose_id,
+                    "patient_id": patient_id,
+                    "status": "missed",
+                    "logged_at": now_utc.isoformat(),
+                },
+            ).execute()
         except Exception as exc:  # noqa: BLE001
             if "duplicate" in str(exc).lower() or "unique" in str(exc).lower():
-                logger.debug(
-                    "dose_log for dose=%s already exists, skipping insert", dose_id
-                )
+                logger.debug("dose_log for dose=%s already exists", dose_id)
                 continue
             logger.error(
                 "Failed to insert missed dose_log for dose=%s: %s", dose_id, exc
@@ -144,11 +121,8 @@ async def escalate_missed_doses() -> None:
 
         missed_count += 1
 
-        patient_name = await _get_patient_name(db, patient_id)
-
-        dose_label = (
-            f"{dosage_amount} {dosage_unit}".strip() if dosage_amount else ""
-        )
+        patient_name = _get_patient_name(db, patient_id)
+        dose_label = f"{dosage_amount} {dosage_unit}".strip() if dosage_amount else ""
         title = f"Missed Dose Alert — {patient_name}"
         body = (
             f"{patient_name} missed their {med_name}"
@@ -172,28 +146,39 @@ async def escalate_missed_doses() -> None:
         except Exception as exc:  # noqa: BLE001
             logger.error(
                 "Failed to notify caregivers for patient=%s dose=%s: %s",
-                patient_id,
-                dose_id,
-                exc,
+                patient_id, dose_id, exc,
             )
 
     logger.info("escalation_worker: processed %d missed dose(s)", missed_count)
 
 
-async def _get_patient_name(db: Any, patient_id: str) -> str:
-    """Helper to fetch the patient's display name for notification messages."""
+def _get_grace_mins(db: Any, patient_id: str) -> int:
+    """Fetch medication_grace_mins for the patient_profiles row with id=patient_id."""
     try:
-        result = await (
+        result = (
             db.table("patient_profiles")
-            .select("profiles(full_name)")
-            .eq("patient_id", patient_id)
-            .single()
+            .select("medication_grace_mins")
+            .eq("id", patient_id)
+            .maybe_single()
             .execute()
         )
-        return (
-            (getattr(result, "data", None) or {})
-            .get("profiles", {})
-            .get("full_name", "Patient")
+        data = (result.data or {}) if result else {}
+        return data.get("medication_grace_mins", 30) or 30
+    except Exception:  # noqa: BLE001
+        return 30
+
+
+def _get_patient_name(db: Any, patient_id: str) -> str:
+    """Fetch the patient's display name. patient_id is patient_profiles.id."""
+    try:
+        result = (
+            db.table("patient_profiles")
+            .select("profile_id, profiles(full_name)")
+            .eq("id", patient_id)
+            .maybe_single()
+            .execute()
         )
+        data = (result.data or {}) if result else {}
+        return (data.get("profiles") or {}).get("full_name", "Patient") or "Patient"
     except Exception:  # noqa: BLE001
         return "Patient"

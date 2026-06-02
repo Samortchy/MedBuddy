@@ -17,6 +17,7 @@ import 'screens/onboarding/s09_checkin_prefs.dart';
 import 'screens/onboarding/s10_review.dart';
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
+import 'providers/ai_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/history_providers.dart';
 import 'providers/medication_provider.dart';
@@ -52,6 +53,11 @@ import 'screens/patient/history/s29_visit_summary.dart';
 import 'screens/patient/profile/s25_my_profile.dart';
 import 'screens/patient/profile/s26_patient_chat.dart';
 import 'screens/patient/profile/s27_app_settings.dart';
+import 'screens/patient/profile/edit/edit_basic_info.dart';
+import 'screens/patient/profile/edit/edit_conditions.dart';
+import 'screens/patient/profile/edit/edit_medications.dart';
+import 'screens/patient/profile/edit/edit_contacts.dart';
+import 'screens/patient/profile/edit/edit_checkin_prefs.dart';
 
 // ── Caregiver ─────────────────────────────────────────────────────────────────
 import 'screens/caregiver/c01_patient_list.dart';
@@ -122,8 +128,8 @@ class MedBuddyApp extends StatelessWidget {
         '/reminder-active': (_) => const ReminderActive(),
 
         // ── Patient Check-in & AI ──────────────────────────────────────
-        '/ai-chat': (_) => const AIBuddyChatScreen(),
-        '/checkin': (_) => const WellnessCheckInScreen(),
+        '/ai-chat': (_) => const _AIBuddyChatRoute(),
+        '/checkin': (_) => const _CheckInRoute(),
 
         // ── Patient History ────────────────────────────────────────────
         '/wellness-history': (_) => const _WellnessHistoryRoute(),
@@ -186,45 +192,170 @@ class _MyProfileRoute extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profileState = ref.watch(patientProfileProvider);
+    final profileState    = ref.watch(patientProfileProvider);
     final conditionsState = ref.watch(healthConditionsProvider);
-    final contactsState = ref.watch(emergencyContactsProvider);
+    final contactsState   = ref.watch(emergencyContactsProvider);
+    final medState        = ref.watch(medicationProvider);
+    final caregiversState = ref.watch(myCaregiversProvider);
 
     final data = profileState.valueOrNull;
-    final conditions = conditionsState.valueOrNull ?? [];
-    final contacts = contactsState.valueOrNull ?? [];
-    final primaryContact =
-        contacts.isNotEmpty ? contacts.first : null;
 
-    final profile = data == null
-        ? null
-        : PatientProfile(
-            id: data.id,
-            fullName: data.fullName,
-            age: _ageFromDob(data.dateOfBirth),
-            gender: '',
-            language: data.preferredLanguage ?? 'English',
-            conditions: conditions,
-            medications: const [],
-            primaryContactName: primaryContact?.name ?? '',
-            primaryContactPhone: primaryContact?.phone ?? '',
-            primaryContactRelationship:
-                primaryContact?.relationship ?? '',
-            checkInHour: 9,
-            checkInVoiceMode: false,
-            painBaseline: 0,
-            caregivers: const [],
-            profileCompleteness: 80,
-          );
+    // Don't show fake placeholder data — show a loading/error state until the
+    // real profile is available.
+    if (data == null) {
+      return Scaffold(
+        backgroundColor: MedBuddyColors.warmWhite,
+        body: Center(
+          child: profileState.isLoading
+              ? const CircularProgressIndicator(color: MedBuddyColors.primary)
+              : Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline,
+                          color: MedBuddyColors.slate500, size: 40),
+                      const SizedBox(height: 12),
+                      const Text('Could not load your profile.',
+                          textAlign: TextAlign.center),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () =>
+                            ref.read(patientProfileProvider.notifier).fetch(),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+      );
+    }
+
+    final conditions = conditionsState.valueOrNull ?? [];
+    final contacts   = contactsState.valueOrNull ?? [];
+    final primaryContact = contacts.isNotEmpty ? contacts.first : null;
+
+    // Map medication provider items → PatientProfile.medications (dedup by name)
+    final medSeen = <String>{};
+    final medications = medState.medications
+        .where((m) => medSeen.add(m.name.toLowerCase()))
+        .map((m) => MedicationEntry(
+              id: m.id,
+              name: m.name,
+              dose: m.dosage,
+              frequency: m.frequency,
+              status: MedicationStatus.pending,
+            ))
+        .toList();
+
+    // Calculate completeness based on what's filled
+    int completeness = 0;
+    if (data.fullName.isNotEmpty) completeness += 20;
+    if (data.dateOfBirth != null) completeness += 15;
+    if (conditions.isNotEmpty) completeness += 20;
+    if (medications.isNotEmpty) completeness += 15;
+    if (contacts.isNotEmpty) completeness += 15;
+    if (data.checkinTime != null) completeness += 15;
+
+    final profile = PatientProfile(
+      id: data.id,
+      fullName: data.fullName,
+      age: _ageFromDob(data.dateOfBirth),
+      gender: data.gender ?? '',
+      language: _languageDisplay(data.preferredLanguage),
+      conditions: conditions,
+      medications: medications,
+      primaryContactName: primaryContact?.name ?? '',
+      primaryContactPhone: primaryContact?.phone ?? '',
+      primaryContactRelationship: primaryContact?.relationship ?? '',
+      checkInHour: _hourFromTime(data.checkinTime),
+      checkInVoiceMode: false,
+      painBaseline: data.painBaseline ?? 0,
+      caregivers: caregiversState.valueOrNull ?? const [],
+      profileCompleteness: completeness,
+    );
 
     return MyProfileScreen(
       profile: profile,
+      onEditSection: (section) => _handleEditSection(context, ref, section),
       onGenerateInvite: () async {
         final dio = ref.read(apiServiceProvider);
         final response = await dio.post('/caregiver/invite');
+        ref.invalidate(myCaregiversProvider);
         return response.data['code'] as String;
       },
+      onRevokeCaregiver: (linkId) async {
+        final dio = ref.read(apiServiceProvider);
+        try {
+          await dio.delete('/caregiver/links/$linkId');
+        } finally {
+          ref.invalidate(myCaregiversProvider);
+        }
+      },
     );
+  }
+
+  /// Routes a profile section edit to its dedicated editor screen.
+  /// 'all' opens a small edit hub (bottom sheet) listing every section.
+  Future<void> _handleEditSection(
+      BuildContext context, WidgetRef ref, String section) async {
+    if (section == 'all') {
+      final chosen = await showModalBottomSheet<String>(
+        context: context,
+        backgroundColor: MedBuddyColors.pureWhite,
+        shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (_) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              _EditHubTile(section: 'basic_info', icon: Icons.person_outline, label: 'Basic Info'),
+              _EditHubTile(section: 'conditions', icon: Icons.monitor_heart_outlined, label: 'Health Conditions'),
+              _EditHubTile(section: 'medications', icon: Icons.medication_outlined, label: 'Medications'),
+              _EditHubTile(section: 'emergency_contacts', icon: Icons.phone_outlined, label: 'Emergency Contacts'),
+              _EditHubTile(section: 'checkin_prefs', icon: Icons.schedule_outlined, label: 'Check-in Preferences'),
+            ],
+          ),
+        ),
+      );
+      if (chosen != null && context.mounted) {
+        await _handleEditSection(context, ref, chosen);
+      }
+      return;
+    }
+
+    Widget? screen;
+    switch (section) {
+      case 'basic_info':
+        screen = const EditBasicInfoScreen();
+      case 'conditions':
+        screen = const EditConditionsScreen();
+      case 'medications':
+        screen = const EditMedicationsScreen();
+      case 'emergency_contacts':
+        screen = const EditContactsScreen();
+      case 'checkin_prefs':
+        screen = const EditCheckinPrefsScreen();
+    }
+    final target = screen;
+    if (target == null) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => target),
+    );
+
+    // Refresh everything the profile reads so it reflects any edits.
+    ref.read(patientProfileProvider.notifier).fetch();
+    ref.invalidate(healthConditionsProvider);
+    ref.invalidate(emergencyContactsProvider);
+    ref.read(medicationProvider.notifier).refresh();
+  }
+
+  int _hourFromTime(String? time) {
+    if (time == null || time.length < 2) return 9;
+    return int.tryParse(time.substring(0, 2)) ?? 9;
   }
 
   int _ageFromDob(String? dob) {
@@ -234,12 +365,20 @@ class _MyProfileRoute extends ConsumerWidget {
       final now = DateTime.now();
       int age = now.year - birth.year;
       if (now.month < birth.month ||
-          (now.month == birth.month && now.day < birth.day)) {
-        age--;
-      }
+          (now.month == birth.month && now.day < birth.day)) age--;
       return age;
     } catch (_) {
       return 0;
+    }
+  }
+
+  String _languageDisplay(String? code) {
+    switch (code) {
+      case 'ar': return 'Arabic';
+      case 'en': return 'English';
+      case 'fr': return 'French';
+      case null: return 'English';
+      default:   return code!;
     }
   }
 }
@@ -523,6 +662,57 @@ class _CaregiverShellState extends State<CaregiverShell> {
               icon: Icon(Icons.settings), label: 'Settings'),
         ],
       ),
+    );
+  }
+}
+
+// ── AI route wrappers (inject providers) ─────────────────────────────────────
+
+class _AIBuddyChatRoute extends ConsumerWidget {
+  const _AIBuddyChatRoute();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return AIBuddyChatScreen(
+      aiService: ref.read(aiServiceProvider),
+      sttService: ref.read(sttServiceProvider),
+      ttsService: ref.read(ttsServiceProvider),
+    );
+  }
+}
+
+class _CheckInRoute extends ConsumerWidget {
+  const _CheckInRoute();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return WellnessCheckInScreen(
+      aiService: ref.read(aiServiceProvider),
+      sttService: ref.read(sttServiceProvider),
+      ttsService: ref.read(ttsServiceProvider),
+    );
+  }
+}
+
+// ── Edit hub tile (used by the "edit all" bottom sheet) ──────────────────────
+class _EditHubTile extends StatelessWidget {
+  final String section;
+  final IconData icon;
+  final String label;
+
+  const _EditHubTile({
+    required this.section,
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: MedBuddyColors.primary),
+      title: Text(label),
+      trailing: const Icon(Icons.chevron_right, color: MedBuddyColors.slate500),
+      onTap: () => Navigator.pop(context, section),
     );
   }
 }

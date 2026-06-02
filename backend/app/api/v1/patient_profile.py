@@ -74,6 +74,8 @@ async def update_patient_profile(
         profile_fields["avatar_url"] = payload.avatar_url
     if payload.preferred_language is not None:
         profile_fields["preferred_language"] = payload.preferred_language
+    if payload.gender is not None:
+        profile_fields["gender"] = payload.gender
 
     # Fields that live in the patient_profiles table
     patient_fields = {}
@@ -89,6 +91,8 @@ async def update_patient_profile(
         patient_fields["checkin_frequency"] = payload.checkin_frequency
     if payload.medication_grace_mins is not None:
         patient_fields["medication_grace_mins"] = payload.medication_grace_mins
+    if payload.pain_baseline is not None:
+        patient_fields["pain_baseline"] = payload.pain_baseline
 
     if not profile_fields and not patient_fields:
         raise HTTPException(

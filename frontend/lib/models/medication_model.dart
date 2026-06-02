@@ -52,7 +52,9 @@ class DoseEntry {
   static String _scheduledAtToKey(String scheduledAt) {
     if (scheduledAt.isEmpty) return 'morning';
     try {
-      final hour = DateTime.parse(scheduledAt).toLocal().hour;
+      // Use UTC hour directly — doses are stored in UTC with schedule times
+      // as-is (08:00 = morning, 13:00 = afternoon, etc.)
+      final hour = DateTime.parse(scheduledAt).toUtc().hour;
       if (hour < 11) return 'morning';
       if (hour < 15) return 'afternoon';
       if (hour < 20) return 'evening';

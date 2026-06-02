@@ -27,31 +27,6 @@ class SymptomLogScreen extends StatefulWidget {
 }
 
 class _SymptomLogScreenState extends State<SymptomLogScreen> {
-  // Placeholder entries — replace with widget.entries when backend is wired
-  final List<Map<String, dynamic>> _placeholderEntries = [
-    {
-      'date': 'Apr 5',
-      'description': 'Mild headache in the morning, went away after breakfast.',
-      'severity': SymptomSeverity.normal,
-    },
-    {
-      'date': 'Apr 1',
-      'description':
-          'Shortness of breath after walking upstairs. Lasted about 10 minutes.',
-      'severity': SymptomSeverity.flagged,
-    },
-    {
-      'date': 'Mar 29',
-      'description': 'Feeling more tired than usual. No specific symptoms.',
-      'severity': SymptomSeverity.watch,
-    },
-    {
-      'date': 'Mar 26',
-      'description':
-          'Slight joint stiffness in the morning. Felt better after moving around.',
-      'severity': SymptomSeverity.normal,
-    },
-  ];
 
   void _showAddEntrySheet() {
     final controller = TextEditingController();
@@ -239,15 +214,26 @@ class _SymptomLogScreenState extends State<SymptomLogScreen> {
   }
 
   Widget _buildTimeline() {
-    final entries = widget.entries.isEmpty
-        ? _placeholderEntries
-        : widget.entries
-            .map((e) => {
-                  'date': '${e.timestamp.month}/${e.timestamp.day}',
-                  'description': e.description,
-                  'severity': e.severity,
-                })
-            .toList();
+    if (widget.entries.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Center(
+          child: Column(
+            children: [
+              const Icon(Icons.note_alt_outlined,
+                  size: 40, color: MedBuddyColors.slate300),
+              const SizedBox(height: 8),
+              Text('No symptoms logged yet',
+                  style: MedBuddyTextStyles.bodyBold
+                      .copyWith(color: MedBuddyColors.slate500)),
+              const SizedBox(height: 4),
+              Text('Tap "Add Today\'s Entry" to start tracking.',
+                  style: MedBuddyTextStyles.secondary),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Stack(
       children: [
@@ -258,8 +244,15 @@ class _SymptomLogScreenState extends State<SymptomLogScreen> {
           child: Container(width: 2, color: MedBuddyColors.primaryLight),
         ),
         Column(
-          children: entries.asMap().entries.map((e) {
-            return _buildTimelineEntry(e.value, e.key == entries.length - 1);
+          children: widget.entries.asMap().entries.map((e) {
+            final entry = e.value;
+            final data = {
+              'date':
+                  '${entry.timestamp.month}/${entry.timestamp.day}',
+              'description': entry.description,
+              'severity': entry.severity,
+            };
+            return _buildTimelineEntry(data, e.key == widget.entries.length - 1);
           }).toList(),
         ),
       ],

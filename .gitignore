@@ -32,3 +32,21 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Test tokens & local creds — never commit
+tests/.env.test
+tests/.env.local
+backend/.env
+
+# Database schema edits (run manually in Supabase, not tracked)
+database/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Test audio artifacts (generated / large binaries)
+tests/*.wav
+
+# Local Claude Code settings (machine-specific)
+.claude/settings.local.json

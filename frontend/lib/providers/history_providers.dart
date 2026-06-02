@@ -5,6 +5,14 @@ import '../services/service_interfaces.dart';
 
 // ── Wellness check-ins ────────────────────────────────────────────────────────
 
+String _sleepLabel(int? score) {
+  if (score == null) return 'fair';
+  if (score >= 5) return 'excellent';
+  if (score >= 4) return 'good';
+  if (score >= 3) return 'fair';
+  return 'poor';
+}
+
 final wellnessCheckInsProvider =
     FutureProvider<List<WellnessCheckIn>>((ref) async {
   final dio = ref.watch(apiServiceProvider);
@@ -12,15 +20,21 @@ final wellnessCheckInsProvider =
   final list = response.data as List<dynamic>? ?? [];
   return list.map((e) {
     final m = e as Map<String, dynamic>;
+    DateTime ts;
+    try {
+      ts = DateTime.parse(m['completed_at'] as String).toLocal();
+    } catch (_) {
+      ts = DateTime.now();
+    }
     return WellnessCheckIn(
       id: m['id'] as String,
-      timestamp: DateTime.parse(m['created_at'] as String).toLocal(),
-      mood: (m['mood'] as num?)?.toInt() ?? 3,
-      energy: (m['energy'] as num?)?.toInt() ?? 3,
+      timestamp: ts,
+      mood: (m['mood_score'] as num?)?.toInt() ?? 3,
+      energy: (m['energy_score'] as num?)?.toInt() ?? 3,
       painLevel: (m['pain_level'] as num?)?.toInt() ?? 0,
-      sleepQuality: m['sleep_quality'] as String? ?? 'fair',
-      allMedsTaken: m['all_meds_taken'] as bool? ?? false,
-      isFlagged: m['is_flagged'] as bool? ?? false,
+      sleepQuality: _sleepLabel((m['sleep_quality'] as num?)?.toInt()),
+      allMedsTaken: m['meds_confirmed'] as bool? ?? false,
+      isFlagged: (m['ai_flags'] as List?)?.isNotEmpty ?? false,
     );
   }).toList();
 });
@@ -34,17 +48,26 @@ final emergencyEventsProvider =
   final list = response.data as List<dynamic>? ?? [];
   return list.map((e) {
     final m = e as Map<String, dynamic>;
-    final typeStr = m['event_type'] as String? ?? 'manual_sos';
+    final typeStr = m['trigger_type'] as String? ?? 'manual_sos';
     final outcomeStr = m['outcome'] as String? ?? 'cancelled';
+    DateTime ts;
+    try {
+      ts = DateTime.parse(m['triggered_at'] as String).toLocal();
+    } catch (_) {
+      ts = DateTime.now();
+    }
+    final lat = m['gps_lat'];
+    final lng = m['gps_lng'];
+    final gps = (lat != null && lng != null) ? '$lat,$lng' : null;
     return EmergencyEvent(
       id: m['id'] as String,
       type: typeStr == 'fall_detected'
           ? EmergencyEventType.fallDetected
           : EmergencyEventType.manualSOS,
-      timestamp: DateTime.parse(m['created_at'] as String).toLocal(),
+      timestamp: ts,
       outcome: _parseOutcome(outcomeStr),
-      steps: _parseSteps(m['steps']),
-      gpsCoordinates: m['gps_coordinates'] as String?,
+      steps: _parseSteps(m['emergency_escalation_steps']),
+      gpsCoordinates: gps,
     );
   }).toList();
 });
@@ -67,11 +90,16 @@ List<EmergencyStep> _parseSteps(dynamic raw) {
   try {
     return (raw as List<dynamic>).map((s) {
       final m = s as Map<String, dynamic>;
+      DateTime stepTs;
+      try {
+        stepTs = DateTime.parse(m['attempted_at'] as String).toLocal();
+      } catch (_) {
+        stepTs = DateTime.now();
+      }
       return EmergencyStep(
-        description: m['description'] as String? ?? '',
-        timestamp:
-            DateTime.parse(m['timestamp'] as String).toLocal(),
-        success: m['success'] as bool? ?? true,
+        description: m['step_type'] as String? ?? '',
+        timestamp: stepTs,
+        success: (m['status'] as String?) == 'completed',
       );
     }).toList();
   } catch (_) {
@@ -95,16 +123,17 @@ class SymptomLogNotifier extends StateNotifier<AsyncValue<List<SymptomEntry>>> {
       final list = response.data as List<dynamic>? ?? [];
       final entries = list.map((e) {
         final m = e as Map<String, dynamic>;
-        final sevStr = m['severity'] as String? ?? 'normal';
+        DateTime ts;
+        try {
+          ts = DateTime.parse(m['logged_at'] as String).toLocal();
+        } catch (_) {
+          ts = DateTime.now();
+        }
         return SymptomEntry(
           id: m['id'] as String,
-          description: m['description'] as String? ?? '',
-          timestamp: DateTime.parse(m['created_at'] as String).toLocal(),
-          severity: sevStr == 'flagged'
-              ? SymptomSeverity.flagged
-              : sevStr == 'watch'
-                  ? SymptomSeverity.watch
-                  : SymptomSeverity.normal,
+          description: m['body'] as String? ?? '',
+          timestamp: ts,
+          severity: SymptomSeverity.normal,
         );
       }).toList();
       state = AsyncValue.data(entries);
@@ -119,7 +148,7 @@ class SymptomLogNotifier extends StateNotifier<AsyncValue<List<SymptomEntry>>> {
   }
 
   Future<void> add(String description) async {
-    await _dio.post('/symptom-logs/', data: {'description': description});
+    await _dio.post('/symptom-logs/', data: {'body': description, 'input_type': 'text'});
     await fetch();
   }
 }
@@ -135,21 +164,25 @@ final healthConditionsProvider = FutureProvider<List<String>>((ref) async {
   final dio = ref.watch(apiServiceProvider);
   final response = await dio.get('/health-conditions/');
   final list = response.data as List<dynamic>? ?? [];
+  final seen = <String>{};
   return list
       .map((e) => (e as Map<String, dynamic>)['name'] as String? ?? '')
       .where((s) => s.isNotEmpty)
+      .where((s) => seen.add(s.toLowerCase()))
       .toList();
 });
 
 // ── Emergency contacts ────────────────────────────────────────────────────────
 
 class EmergencyContactData {
+  final String id;
   final String name;
   final String phone;
   final String relationship;
   final int priority;
 
   const EmergencyContactData({
+    required this.id,
     required this.name,
     required this.phone,
     required this.relationship,
@@ -158,6 +191,7 @@ class EmergencyContactData {
 
   factory EmergencyContactData.fromJson(Map<String, dynamic> json) {
     return EmergencyContactData(
+      id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       phone: json['phone'] as String? ?? '',
       relationship: json['relationship'] as String? ?? '',

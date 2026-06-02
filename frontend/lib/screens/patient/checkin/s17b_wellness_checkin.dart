@@ -44,13 +44,10 @@ class _WellnessCheckInScreenState extends State<WellnessCheckInScreen>
 
   bool _isListening = false;
 
-  // Replace with real session data from AIService.startCheckIn()
-  final int _currentQuestion = 3;
-  final int _totalQuestions = 5;
-  final String _questionText =
-      'How are you feeling today? Rate your energy from 1 to 5.';
-  // ignore: unused_field
-  final String _sessionId = ''; // set from AIService.startCheckIn()
+  int _currentQuestion = 1;
+  int _totalQuestions = 5;
+  String _questionText = 'How are you feeling today?';
+  String _sessionId = '';
 
   @override
   void initState() {
@@ -70,23 +67,21 @@ class _WellnessCheckInScreenState extends State<WellnessCheckInScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // TODO: Start check-in session and read question aloud
-    // _initSession();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initSession());
   }
 
-  // â”€â”€ Backend hook: init session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Future<void> _initSession() async {
-  //   final session = await widget.aiService?.startCheckIn();
-  //   if (session != null && mounted) {
-  //     setState(() {
-  //       _sessionId = session.sessionId;
-  //       _questionText = session.firstQuestion.text;
-  //       _currentQuestion = session.firstQuestion.questionNumber;
-  //       _totalQuestions = session.firstQuestion.totalQuestions;
-  //     });
-  //     widget.ttsService?.speak(_questionText);
-  //   }
-  // }
+  Future<void> _initSession() async {
+    final session = await widget.aiService?.startCheckIn();
+    if (session != null && mounted) {
+      setState(() {
+        _sessionId = session.sessionId;
+        _questionText = session.firstQuestion.text;
+        _currentQuestion = session.firstQuestion.questionNumber;
+        _totalQuestions = session.firstQuestion.totalQuestions;
+      });
+      // TTS opt-in only — don't auto-speak questions
+    }
+  }
 
   @override
   void dispose() {
@@ -96,31 +91,33 @@ class _WellnessCheckInScreenState extends State<WellnessCheckInScreen>
     super.dispose();
   }
 
-  // â”€â”€ Backend hook: submit answer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> _submitAnswer(String answer) async {
-    // TODO:
-    // final nextQuestion = await widget.aiService
-    //     ?.submitCheckInAnswer(_sessionId, answer);
-    // if (nextQuestion == null) {
-    //   widget.onComplete?.call();
-    //   return;
-    // }
-    // setState(() {
-    //   _questionText = nextQuestion.text;
-    //   _currentQuestion = nextQuestion.questionNumber;
-    // });
-    // widget.ttsService?.speak(_questionText);
+    final nextQuestion =
+        await widget.aiService?.submitCheckInAnswer(_sessionId, answer);
+    if (nextQuestion == null) {
+      widget.onComplete?.call();
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+    if (mounted) {
+      setState(() {
+        _questionText = nextQuestion.text;
+        _currentQuestion = nextQuestion.questionNumber;
+        _totalQuestions = nextQuestion.totalQuestions;
+      });
+      // TTS opt-in only — don't auto-speak questions
+    }
   }
 
-  // â”€â”€ Backend hook: toggle mic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> _toggleListening() async {
     if (_isListening) {
       setState(() => _isListening = false);
-      // TODO: final text = await widget.sttService?.stopListening();
-      // if (text != null) _submitAnswer(text);
+      await widget.sttService?.stopListening();
     } else {
       setState(() => _isListening = true);
-      // TODO: widget.sttService?.startListening();
+      final text = await widget.sttService?.startListening() ?? '';
+      if (mounted) setState(() => _isListening = false);
+      if (text.isNotEmpty) _submitAnswer(text);
     }
   }
 

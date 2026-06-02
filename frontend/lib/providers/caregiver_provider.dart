@@ -16,13 +16,10 @@ class LinkedPatient {
   });
 
   factory LinkedPatient.fromJson(Map<String, dynamic> json) {
-    // Backend returns patient_profiles joined with profiles
-    final profile = json['profiles'] as Map<String, dynamic>? ?? {};
+    // Backend returns flat: patient_profile_id, full_name, phone, date_of_birth, linked_at
     return LinkedPatient(
-      id: json['id'] as String,
-      fullName: profile['full_name'] as String? ??
-          json['full_name'] as String? ??
-          'Patient',
+      id: json['patient_profile_id'] as String? ?? json['id'] as String,
+      fullName: json['full_name'] as String? ?? 'Patient',
       lastCheckinAt: json['last_checkin_at'] as String?,
       profileId: json['profile_id'] as String?,
     );
@@ -60,7 +57,9 @@ class CaregiverPatientsNotifier
     state = const AsyncValue.loading();
     try {
       final response = await _dio.get('/caregiver/patients');
-      final list = response.data as List<dynamic>? ?? [];
+      // Backend returns {"patients": [...], "total": N}
+      final body = response.data as Map<String, dynamic>;
+      final list = body['patients'] as List<dynamic>? ?? [];
       final patients = list
           .map((p) => LinkedPatient.fromJson(p as Map<String, dynamic>))
           .toList();

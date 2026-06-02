@@ -7,7 +7,7 @@ import '../../../widgets/shared/sos_button.dart';
 import '../../../widgets/shared/bottom_nav_bar.dart';
 
 /// S-24 — Emergency Event Log
-class EmergencyEventLogScreen extends StatelessWidget {
+class EmergencyEventLogScreen extends StatefulWidget {
   final List<EmergencyEvent> events;
   final VoidCallback? onExport;
 
@@ -17,71 +17,46 @@ class EmergencyEventLogScreen extends StatelessWidget {
     this.onExport,
   });
 
-  // Placeholder events — replace with widget.events
-  List<Map<String, dynamic>> get _placeholderEvents => [
-        {
-          'type': 'Fall Detected',
-          'date': 'Apr 5, 7:42 AM',
-          'outcome': 'Handled by Caregiver',
-          'outcomeColor': MedBuddyColors.success,
-          'borderColor': MedBuddyColors.success,
-          'bgColor': MedBuddyColors.pureWhite,
-          'detail': 'Agora channel connected · Sarah responded',
-          'expanded': false,
-          'steps': <Map<String, dynamic>>[],
-        },
-        {
-          'type': 'SOS Activated',
-          'date': 'Apr 3, 2:15 PM',
-          'outcome': 'False Alarm — Cancelled',
-          'outcomeColor': MedBuddyColors.success,
-          'borderColor': MedBuddyColors.success,
-          'bgColor': MedBuddyColors.pureWhite,
-          'detail': 'Cancelled within 10s · No escalation',
-          'expanded': false,
-          'steps': <Map<String, dynamic>>[],
-        },
-        {
-          'type': 'Fall Detected',
-          'date': 'Mar 28, 11:03 PM',
-          'outcome': '911 Activated',
-          'outcomeColor': MedBuddyColors.emergency,
-          'borderColor': MedBuddyColors.emergency,
-          'bgColor': const Color(0xFFFFF5F5),
-          'detail': 'Full escalation chain triggered',
-          'expanded': true,
-          'steps': [
-            {
-              'desc': 'Fall detected — 10s cancel window',
-              'time': '11:03:00 PM',
-              'success': true
-            },
-            {
-              'desc': 'Factor 1 — Name verification failed',
-              'time': '11:03:12 PM',
-              'success': false
-            },
-            {
-              'desc': 'Factor 1.5 — Retry also failed',
-              'time': '11:03:20 PM',
-              'success': false
-            },
-            {
-              'desc': 'Agora channel opened to Sarah',
-              'time': '11:03:22 PM',
-              'success': true
-            },
-            {
-              'desc': '911 activated · GPS shared',
-              'time': '11:03:55 PM',
-              'success': false
-            },
-          ],
-        },
-      ];
+  @override
+  State<EmergencyEventLogScreen> createState() =>
+      _EmergencyEventLogScreenState();
+}
+
+class _EmergencyEventLogScreenState extends State<EmergencyEventLogScreen> {
+  final Set<String> _expanded = {};
+
+  String _outcomeLabel(EmergencyOutcome o) {
+    switch (o) {
+      case EmergencyOutcome.handledByCaregiver:
+        return 'Handled by Caregiver';
+      case EmergencyOutcome.falseAlarm:
+        return 'False Alarm';
+      case EmergencyOutcome.activated911:
+        return '911 Activated';
+      case EmergencyOutcome.cancelled:
+        return 'Cancelled';
+    }
+  }
+
+  Color _outcomeColor(EmergencyOutcome o) {
+    switch (o) {
+      case EmergencyOutcome.activated911:
+        return MedBuddyColors.emergency;
+      case EmergencyOutcome.handledByCaregiver:
+      case EmergencyOutcome.falseAlarm:
+      case EmergencyOutcome.cancelled:
+        return MedBuddyColors.success;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final events = widget.events;
+    final fallCount =
+        events.where((e) => e.type == EmergencyEventType.fallDetected).length;
+    final sosCount =
+        events.where((e) => e.type == EmergencyEventType.manualSOS).length;
+
     return Scaffold(
       backgroundColor: MedBuddyColors.warmWhite,
       body: Stack(
@@ -90,20 +65,23 @@ class EmergencyEventLogScreen extends StatelessWidget {
             children: [
               _buildAppBar(context),
               Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.only(
-                    left: MedBuddyDimens.spacingMd,
-                    right: MedBuddyDimens.spacingMd,
-                    top: MedBuddyDimens.spacingMd,
-                    bottom: MedBuddyDimens.bottomNavHeight +
-                        MedBuddyDimens.sosBottomOffset,
-                  ),
-                  children: [
-                    _buildSummaryBar(),
-                    const SizedBox(height: MedBuddyDimens.spacingMd),
-                    ..._placeholderEvents.map(_buildEventCard),
-                  ],
-                ),
+                child: events.isEmpty
+                    ? _buildEmptyState()
+                    : ListView(
+                        padding: const EdgeInsets.only(
+                          left: MedBuddyDimens.spacingMd,
+                          right: MedBuddyDimens.spacingMd,
+                          top: MedBuddyDimens.spacingMd,
+                          bottom: MedBuddyDimens.bottomNavHeight +
+                              MedBuddyDimens.sosBottomOffset,
+                        ),
+                        children: [
+                          _buildSummaryBar(
+                              events.length, fallCount, sosCount),
+                          const SizedBox(height: MedBuddyDimens.spacingMd),
+                          ...events.map(_buildEventCard),
+                        ],
+                      ),
               ),
               PatientBottomNavBar(
                 activeTab: PatientNavTab.history,
@@ -156,7 +134,7 @@ class EmergencyEventLogScreen extends StatelessWidget {
                   style: MedBuddyTextStyles.heading3,
                   textAlign: TextAlign.center)),
           IconButton(
-            onPressed: onExport,
+            onPressed: widget.onExport,
             icon: const Icon(Icons.calendar_today_outlined,
                 color: MedBuddyColors.primary),
           ),
@@ -165,7 +143,30 @@ class EmergencyEventLogScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryBar() {
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(MedBuddyDimens.spacingXl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.shield_outlined,
+                size: 48, color: MedBuddyColors.slate300),
+            const SizedBox(height: 12),
+            Text('No emergency events',
+                style: MedBuddyTextStyles.bodyBold
+                    .copyWith(color: MedBuddyColors.slate500)),
+            const SizedBox(height: 4),
+            Text('All clear. Emergency events will appear here.',
+                style: MedBuddyTextStyles.secondary,
+                textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryBar(int total, int falls, int sos) {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: MedBuddyDimens.spacingMd,
@@ -180,16 +181,16 @@ class EmergencyEventLogScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           RichText(
-            text: const TextSpan(
+            text: TextSpan(
               children: [
                 TextSpan(
-                    text: '3 events',
-                    style: TextStyle(
+                    text: '$total event${total == 1 ? '' : 's'}',
+                    style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         color: MedBuddyColors.slate900,
                         fontSize: 14)),
-                TextSpan(
-                    text: ' this month',
+                const TextSpan(
+                    text: ' total',
                     style: TextStyle(
                         color: MedBuddyColors.slate700, fontSize: 14)),
               ],
@@ -197,11 +198,14 @@ class EmergencyEventLogScreen extends StatelessWidget {
           ),
           Row(
             children: [
-              _badge(MedBuddyColors.emergencyLight, MedBuddyColors.emergency,
-                  'Fall x2'),
-              const SizedBox(width: 8),
-              _badge(MedBuddyColors.warningLight, MedBuddyColors.warning,
-                  'SOS x1'),
+              if (falls > 0) ...[
+                _badge(MedBuddyColors.emergencyLight, MedBuddyColors.emergency,
+                    'Fall x$falls'),
+                const SizedBox(width: 8),
+              ],
+              if (sos > 0)
+                _badge(MedBuddyColors.warningLight, MedBuddyColors.warning,
+                    'SOS x$sos'),
             ],
           ),
         ],
@@ -220,107 +224,101 @@ class EmergencyEventLogScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildEventCard(Map<String, dynamic> event) {
-    final steps = event['steps'] as List<Map<String, dynamic>>;
-    final expanded = event['expanded'] as bool;
+  Widget _buildEventCard(EmergencyEvent event) {
+    final isExpanded = _expanded.contains(event.id);
+    final outcomeColor = _outcomeColor(event.outcome);
+    final isCritical = event.outcome == EmergencyOutcome.activated911;
+    final typeLabel = event.type == EmergencyEventType.fallDetected
+        ? 'Fall Detected'
+        : 'SOS Activated';
+    final d = event.timestamp;
+    final dateStr =
+        '${d.month}/${d.day}/${d.year} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: MedBuddyDimens.spacingMd),
-      decoration: BoxDecoration(
-        color: event['bgColor'] as Color,
-        borderRadius: BorderRadius.circular(MedBuddyDimens.radiusLg),
-        border: Border(
-          left: BorderSide(color: event['borderColor'] as Color, width: 4),
-          top: const BorderSide(color: MedBuddyColors.slate300, width: 0.5),
-          right: const BorderSide(color: MedBuddyColors.slate300, width: 0.5),
-          bottom: const BorderSide(color: MedBuddyColors.slate300, width: 0.5),
+    return GestureDetector(
+      onTap: () => setState(() {
+        if (isExpanded) {
+          _expanded.remove(event.id);
+        } else {
+          _expanded.add(event.id);
+        }
+      }),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: MedBuddyDimens.spacingMd),
+        decoration: BoxDecoration(
+          color: isCritical ? const Color(0xFFFFF5F5) : MedBuddyColors.pureWhite,
+          borderRadius: BorderRadius.circular(MedBuddyDimens.radiusLg),
+          border: Border(
+            left: BorderSide(color: outcomeColor, width: 4),
+            top: const BorderSide(color: MedBuddyColors.slate300, width: 0.5),
+            right: const BorderSide(color: MedBuddyColors.slate300, width: 0.5),
+            bottom: const BorderSide(color: MedBuddyColors.slate300, width: 0.5),
+          ),
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(MedBuddyDimens.spacingMd),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          _badge(
-                              MedBuddyColors.emergencyLight,
-                              MedBuddyColors.emergency,
-                              event['type'] as String),
-                          const SizedBox(width: 8),
-                          Text(event['date'] as String,
-                              style: MedBuddyTextStyles.caption),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      RichText(
-                        text: TextSpan(
+        child: Padding(
+          padding: const EdgeInsets.all(MedBuddyDimens.spacingMd),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            const TextSpan(
-                                text: 'Outcome: ',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    color: MedBuddyColors.slate700)),
-                            TextSpan(
-                                text: event['outcome'] as String,
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: event['outcomeColor'] as Color)),
+                            _badge(MedBuddyColors.emergencyLight,
+                                MedBuddyColors.emergency, typeLabel),
+                            const SizedBox(width: 8),
+                            Text(dateStr, style: MedBuddyTextStyles.caption),
                           ],
                         ),
-                      ),
-                      Text(event['detail'] as String,
-                          style: MedBuddyTextStyles.caption),
-                    ],
+                        const SizedBox(height: 4),
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              const TextSpan(
+                                  text: 'Outcome: ',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: MedBuddyColors.slate700)),
+                              TextSpan(
+                                  text: _outcomeLabel(event.outcome),
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: outcomeColor)),
+                            ],
+                          ),
+                        ),
+                        if (event.gpsCoordinates != null)
+                          Text('GPS: ${event.gpsCoordinates}',
+                              style: MedBuddyTextStyles.caption),
+                      ],
+                    ),
                   ),
-                ),
-                Icon(expanded ? Icons.keyboard_arrow_down : Icons.chevron_right,
-                    color: MedBuddyColors.slate300),
-              ],
-            ),
-            if (expanded && steps.isNotEmpty) ...[
-              const SizedBox(height: MedBuddyDimens.spacingMd),
-              ...steps
-                  .asMap()
-                  .entries
-                  .map((e) => _buildStep(e.value, e.key == steps.length - 1)),
-              const SizedBox(height: MedBuddyDimens.spacingSm),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: MedBuddyColors.emergencyLight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.location_on_outlined,
-                        color: MedBuddyColors.emergency, size: 14),
-                    const SizedBox(width: 6),
-                    Text('View GPS location at time of event',
-                        style: MedBuddyTextStyles.caption.copyWith(
-                            color: MedBuddyColors.emergency,
-                            fontWeight: FontWeight.w600)),
-                  ],
-                ),
+                  Icon(
+                      isExpanded
+                          ? Icons.keyboard_arrow_down
+                          : Icons.chevron_right,
+                      color: MedBuddyColors.slate300),
+                ],
               ),
+              if (isExpanded && event.steps.isNotEmpty) ...[
+                const SizedBox(height: MedBuddyDimens.spacingMd),
+                ...event.steps.asMap().entries.map(
+                    (e) => _buildStep(e.value, e.key == event.steps.length - 1)),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildStep(Map<String, dynamic> step, bool isLast) {
-    final success = step['success'] as bool;
+  Widget _buildStep(EmergencyStep step, bool isLast) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -330,12 +328,13 @@ class EmergencyEventLogScreen extends StatelessWidget {
               width: 20,
               height: 20,
               decoration: BoxDecoration(
-                color:
-                    success ? MedBuddyColors.success : MedBuddyColors.emergency,
+                color: step.success
+                    ? MedBuddyColors.success
+                    : MedBuddyColors.emergency,
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                success ? Icons.check : Icons.close,
+                step.success ? Icons.check : Icons.close,
                 color: MedBuddyColors.pureWhite,
                 size: 10,
               ),
@@ -351,11 +350,13 @@ class EmergencyEventLogScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(step['desc'] as String,
+                Text(step.description,
                     style: MedBuddyTextStyles.caption.copyWith(
                         fontWeight: FontWeight.w600,
                         color: MedBuddyColors.slate900)),
-                Text(step['time'] as String, style: MedBuddyTextStyles.caption),
+                Text(
+                    '${step.timestamp.hour.toString().padLeft(2, '0')}:${step.timestamp.minute.toString().padLeft(2, '0')}',
+                    style: MedBuddyTextStyles.caption),
               ],
             ),
           ),

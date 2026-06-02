@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from app.api.v1 import (
+    ai,
     dose_logs,
     appointments,
     emergency_contacts,
@@ -16,6 +17,7 @@ from app.api.v1 import (
 
 router = APIRouter()
 
+router.include_router(ai.router)
 router.include_router(dose_logs.router)
 router.include_router(appointments.router)
 router.include_router(emergency_contacts.router)

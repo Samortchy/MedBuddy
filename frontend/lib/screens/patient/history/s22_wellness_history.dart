@@ -25,48 +25,51 @@ class WellnessHistoryScreen extends StatefulWidget {
 }
 
 class _WellnessHistoryScreenState extends State<WellnessHistoryScreen> {
-  int _selectedRange = 7; // days
+  int _selectedRange = 7;
   final List<int> _ranges = [7, 30, 90];
   final List<String> _rangeLabels = ['7 Days', '30 Days', '3 Months'];
 
-  // Placeholder data — replace with real data from widget.checkIns
-  final List<Map<String, dynamic>> _placeholderCheckIns = [
-    {
-      'date': 'Apr 5 — Morning',
-      'mood': 4,
-      'pain': 2,
-      'sleep': 'good',
-      'flagged': false
-    },
-    {
-      'date': 'Apr 4 — Morning',
-      'mood': 3,
-      'pain': 5,
-      'sleep': 'fair',
-      'flagged': false
-    },
-    {
-      'date': 'Apr 3 — Morning',
-      'mood': 2,
-      'pain': 8,
-      'sleep': 'poor',
-      'flagged': true
-    },
-  ];
+  List<WellnessCheckIn> get _filtered {
+    final cutoff = DateTime.now().subtract(Duration(days: _selectedRange));
+    final list = widget.checkIns
+        .where((c) => c.timestamp.isAfter(cutoff))
+        .toList()
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    return list;
+  }
 
-  // Chart data — replace with derived data from widget.checkIns
-  final List<double> _moodData = [3, 4, 3.5, 5, 4, 4.5, 4];
-  final List<double> _energyData = [4, 3.5, 4.5, 2.5, 3.5, 3, 4];
-  final List<double> _painData = [2, 2.5, 3, 8, 7, 6.5, 3];
-  final List<String> _dayLabels = [
-    'Mon',
-    'Tue',
-    'Wed',
-    'Thu',
-    'Fri',
-    'Sat',
-    'Sun'
-  ];
+  List<double> get _moodData =>
+      _filtered.map((c) => c.mood.toDouble()).toList();
+  List<double> get _energyData =>
+      _filtered.map((c) => c.energy.toDouble()).toList();
+  List<double> get _painData =>
+      _filtered.map((c) => c.painLevel.toDouble()).toList();
+
+  List<String> get _dayLabels => _filtered.map((c) {
+        final d = c.timestamp;
+        return '${d.month}/${d.day}';
+      }).toList();
+
+  String get _aiInsight {
+    final data = _filtered;
+    if (data.length < 2) return 'Add more check-ins to see trends.';
+    final recent = data.reversed.take(3).toList();
+    final avgPain =
+        recent.fold(0, (sum, c) => sum + c.painLevel) / recent.length;
+    final avgMood =
+        recent.fold(0, (sum, c) => sum + c.mood) / recent.length;
+    final flagged = data.where((c) => c.isFlagged).length;
+    if (flagged > 0) {
+      return '$flagged check-in(s) were flagged recently. Consider contacting your doctor.';
+    }
+    if (avgPain > 5) {
+      return 'Pain levels have been elevated recently. Consider checking in with your doctor.';
+    }
+    if (avgMood >= 4) {
+      return 'Your mood has been good lately. Keep it up!';
+    }
+    return 'Your wellness looks stable. Keep checking in daily.';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,17 +90,28 @@ class _WellnessHistoryScreenState extends State<WellnessHistoryScreen> {
                     bottom: MedBuddyDimens.bottomNavHeight +
                         MedBuddyDimens.sosBottomOffset,
                   ),
-                  children: [
-                    _buildAIInsightCard(),
-                    const SizedBox(height: MedBuddyDimens.spacingMd),
-                    _buildChart('Mood', _moodData, 5, isAnomaly: false),
-                    const SizedBox(height: MedBuddyDimens.spacingMd),
-                    _buildChart('Energy', _energyData, 5, isAnomaly: false),
-                    const SizedBox(height: MedBuddyDimens.spacingMd),
-                    _buildChart('Pain Level', _painData, 10, isAnomaly: true),
-                    const SizedBox(height: MedBuddyDimens.spacingMd),
-                    _buildCheckInList(),
-                  ],
+                  children: _filtered.isEmpty
+                      ? [_buildEmptyState()]
+                      : [
+                          _buildAIInsightCard(),
+                          const SizedBox(height: MedBuddyDimens.spacingMd),
+                          if (_moodData.length > 1)
+                            _buildChart('Mood', _moodData, 5,
+                                isAnomaly: false),
+                          if (_moodData.length > 1)
+                            const SizedBox(height: MedBuddyDimens.spacingMd),
+                          if (_energyData.length > 1)
+                            _buildChart('Energy', _energyData, 5,
+                                isAnomaly: false),
+                          if (_energyData.length > 1)
+                            const SizedBox(height: MedBuddyDimens.spacingMd),
+                          if (_painData.length > 1)
+                            _buildChart('Pain Level', _painData, 10,
+                                isAnomaly: true),
+                          if (_painData.length > 1)
+                            const SizedBox(height: MedBuddyDimens.spacingMd),
+                          _buildCheckInList(),
+                        ],
                 ),
               ),
               PatientBottomNavBar(
@@ -240,9 +254,8 @@ class _WellnessHistoryScreenState extends State<WellnessHistoryScreen> {
                         fontWeight: FontWeight.w700,
                         color: MedBuddyColors.primaryDark)),
                 const SizedBox(height: 4),
-                // TODO: Replace with real AI-generated insight from your backend
                 Text(
-                  'Pain scores increased on 3 consecutive days. Consider checking in with your doctor.',
+                  _aiInsight,
                   style: MedBuddyTextStyles.label
                       .copyWith(color: MedBuddyColors.slate700),
                 ),
@@ -328,34 +341,56 @@ class _WellnessHistoryScreenState extends State<WellnessHistoryScreen> {
     );
   }
 
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 60),
+      child: Center(
+        child: Column(
+          children: [
+            const Icon(Icons.monitor_heart_outlined,
+                size: 48, color: MedBuddyColors.slate300),
+            const SizedBox(height: 12),
+            Text('No check-ins yet',
+                style: MedBuddyTextStyles.bodyBold
+                    .copyWith(color: MedBuddyColors.slate500)),
+            const SizedBox(height: 4),
+            Text('Complete your first daily check-in to see trends here.',
+                style: MedBuddyTextStyles.secondary,
+                textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCheckInList() {
+    final items = _filtered.reversed.toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Recent Check-ins', style: MedBuddyTextStyles.bodyBold),
         const SizedBox(height: MedBuddyDimens.spacingSm),
-        ...(_placeholderCheckIns.isEmpty
-            ? widget.checkIns.map(_checkInFromModel).toList()
-            : _placeholderCheckIns.map(_checkInFromMap).toList()),
+        ...items.map(_checkInCard).toList(),
       ],
     );
   }
 
-  Widget _checkInFromMap(Map<String, dynamic> data) {
-    final flagged = data['flagged'] as bool;
-    final declining = (data['pain'] as int) >= 5 && !flagged;
-    Color borderColor = flagged
+  Widget _checkInCard(WellnessCheckIn c) {
+    final Color borderColor = c.isFlagged
         ? MedBuddyColors.emergency
-        : declining
+        : c.painLevel >= 5
             ? MedBuddyColors.warning
             : MedBuddyColors.success;
-
+    final d = c.timestamp;
+    final dateStr =
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
     return Container(
       margin: const EdgeInsets.only(bottom: MedBuddyDimens.spacingSm),
       padding: const EdgeInsets.all(MedBuddyDimens.spacingMd),
       decoration: BoxDecoration(
-        color:
-            flagged ? MedBuddyColors.emergencyLight : MedBuddyColors.pureWhite,
+        color: c.isFlagged
+            ? MedBuddyColors.emergencyLight
+            : MedBuddyColors.pureWhite,
         borderRadius: BorderRadius.circular(MedBuddyDimens.radiusMd),
         border: Border(left: BorderSide(color: borderColor, width: 4)),
         boxShadow: [
@@ -373,10 +408,10 @@ class _WellnessHistoryScreenState extends State<WellnessHistoryScreen> {
               children: [
                 Row(
                   children: [
-                    Text(data['date'],
+                    Text(dateStr,
                         style:
                             MedBuddyTextStyles.bodyBold.copyWith(fontSize: 14)),
-                    if (flagged) ...[
+                    if (c.isFlagged) ...[
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -395,7 +430,7 @@ class _WellnessHistoryScreenState extends State<WellnessHistoryScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Mood ${data['mood']}/5 · Pain ${data['pain']}/10 · Sleep ${data['sleep']}',
+                  'Mood ${c.mood}/5 · Pain ${c.painLevel}/10 · Sleep ${c.sleepQuality}',
                   style: MedBuddyTextStyles.caption,
                 ),
               ],
@@ -405,17 +440,6 @@ class _WellnessHistoryScreenState extends State<WellnessHistoryScreen> {
         ],
       ),
     );
-  }
-
-  Widget _checkInFromModel(WellnessCheckIn checkIn) {
-    // TODO: wire real data model display
-    return _checkInFromMap({
-      'date': checkIn.timestamp.toString(),
-      'mood': checkIn.mood,
-      'pain': checkIn.painLevel,
-      'sleep': checkIn.sleepQuality,
-      'flagged': checkIn.isFlagged,
-    });
   }
 }
 

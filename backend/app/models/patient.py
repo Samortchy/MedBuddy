@@ -26,6 +26,7 @@ class PatientProfileUpdate(BaseModel):
     date_of_birth:      Optional[date]  = None
     avatar_url:         Optional[str]   = None
     preferred_language: Optional[str]   = Field(None, max_length=10)
+    gender:             Optional[str]   = Field(None, max_length=30)
 
     # ── patient_profiles table fields ────────────────────────────
     mobility_level:             Optional[MobilityLevel]   = None
@@ -34,6 +35,7 @@ class PatientProfileUpdate(BaseModel):
     checkin_time:               Optional[str]             = None  # "HH:MM" format
     checkin_frequency:          Optional[int]             = Field(None, ge=1, le=10)
     medication_grace_mins:      Optional[int]             = Field(None, ge=1, le=120)
+    pain_baseline:              Optional[int]             = Field(None, ge=0, le=10)
 
 
 class PatientProfileResponse(BaseModel):

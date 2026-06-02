@@ -27,10 +27,14 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_from_number: str = ""
 
-    # AI Models (Phase 3 — Ali)
-    ollama_base_url: str = "http://localhost:11434"
-    whisper_model_size: str = "large-v3"
-    chatterbox_model_path: str = "./models/chatterbox"
+    # AI Models (Phase 2)
+    whisper_model_size: str = "large-v3-turbo"
+    chatterbox_model_path: str = ""
+    tts_default_language: str = "ar"  # fine-tuned on Arabic; also supports 'en' and 22 others
+
+    # OpenRouter LLM
+    openrouter_api_key: str = ""
+    openrouter_model: str = "meta-llama/llama-3.3-70b-instruct"
 
     class Config:
         env_file = ".env"

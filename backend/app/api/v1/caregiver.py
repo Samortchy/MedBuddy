@@ -197,3 +197,88 @@ async def get_caregiver_patients(
         "patients": patients,
         "total": len(patients),
     }
+
+
+# ─── GET /caregiver/my-caregivers ─────────────────────────────────────────────
+
+@router.get(
+    "/my-caregivers",
+    summary="Get all caregivers linked to the authenticated patient",
+)
+async def get_my_caregivers(
+    current_user: dict = Depends(get_current_patient),
+    db: Client = Depends(get_db),
+):
+    """
+    Returns the list of caregivers linked to the authenticated patient,
+    including each caregiver's name and phone. Patient only.
+    """
+    patient_id = current_user["patient_profile_id"]
+
+    result = (
+        db.table("caregiver_patient_links")
+        .select(
+            "id, status, linked_at, caregiver_id, "
+            "profiles!caregiver_patient_links_caregiver_id_fkey(full_name, phone)"
+        )
+        .eq("patient_id", patient_id)
+        .eq("status", "active")
+        .order("linked_at", desc=True)
+        .execute()
+    )
+
+    caregivers = []
+    for row in (result.data or []):
+        profile = row.get("profiles") or {}
+        caregivers.append({
+            "link_id": row["id"],
+            "caregiver_id": row["caregiver_id"],
+            "full_name": profile.get("full_name"),
+            "phone": profile.get("phone"),
+            "status": row.get("status"),
+            "linked_at": row.get("linked_at"),
+        })
+
+    return {
+        "caregivers": caregivers,
+        "total": len(caregivers),
+    }
+
+
+# ─── DELETE /caregiver/links/{link_id} ────────────────────────────────────────
+
+@router.delete(
+    "/links/{link_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Revoke a caregiver link (patient only)",
+)
+async def revoke_caregiver_link(
+    link_id: str,
+    current_user: dict = Depends(get_current_patient),
+    db: Client = Depends(get_db),
+):
+    """
+    Removes a caregiver's access to the authenticated patient.
+    Only the owning patient may revoke their own caregiver links.
+    """
+    existing = (
+        db.table("caregiver_patient_links")
+        .select("id, patient_id")
+        .eq("id", link_id)
+        .single()
+        .execute()
+    )
+
+    if not existing.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Caregiver link not found.",
+        )
+
+    if str(existing.data["patient_id"]) != str(current_user["patient_profile_id"]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this caregiver link.",
+        )
+
+    db.table("caregiver_patient_links").delete().eq("id", link_id).execute()

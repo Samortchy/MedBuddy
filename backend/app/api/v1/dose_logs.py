@@ -148,16 +148,19 @@ async def get_dose_logs(
         db.table("medication_doses")
         .select(
             "id, scheduled_at, medication_id, "
-            "medications(id, name, dose_amount, dose_unit, patient_id)"
+            "medications(id, name, dose_amount, dose_unit, patient_id, deleted_at)"
         )
         .gte("scheduled_at", day_start)
         .lte("scheduled_at", day_end)
         .execute()
     )
 
+    # Exclude doses whose medication has been soft-deleted so removed
+    # medications stop appearing on the schedule.
     doses = [
         d for d in (doses_result.data or [])
         if str((d.get("medications") or {}).get("patient_id", "")) == str(patient_id)
+        and (d.get("medications") or {}).get("deleted_at") is None
     ]
 
     if not doses:

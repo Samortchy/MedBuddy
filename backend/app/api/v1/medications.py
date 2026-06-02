@@ -52,6 +52,21 @@ async def create_medication(
     logger.info(f"POST /medications/ name={payload.name} dose={payload.dose_amount}{payload.dose_unit}")
     patient_id = current_user["patient_profile_id"]
 
+    # Block duplicate medication names (case-insensitive) for this patient
+    existing_meds = (
+        db.table("medications")
+        .select("id, name")
+        .eq("patient_id", patient_id)
+        .is_("deleted_at", "null")
+        .execute()
+    )
+    name_lower = payload.name.strip().lower()
+    if any(m["name"].lower() == name_lower for m in (existing_meds.data or [])):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A medication with this name already exists. Edit the existing entry instead.",
+        )
+
     # Infer frequency from schedule count if not explicitly provided
     schedule_count = len(payload.schedules)
     frequency = payload.frequency or (

@@ -1,27 +1,17 @@
 """
-checkin_worker.py  (Task #24)
-------------------------------
+checkin_worker.py
+------------------
 Cron job that runs every minute.
 
 For each patient whose checkin_time matches the current UTC minute AND who
-has not yet had a wellness_checkin recorded today, send an FCM push to open
-the check-in flow in the Flutter app.
-
-Design notes
-------------
-- Runs every 60 seconds via APScheduler (registered in scheduler.py).
-- Uses a 1-minute window: matches if abs(now - checkin_time) < 60 seconds.
-- Skips patients whose notification_preferences have quiet hours active
-  (handled inside notify_patient).
-- wellness_checkins.source is set to 'system' by DB default for
-  cron-triggered records; the Flutter app sets 'patient' organically.
+has not yet had a wellness_checkin recorded today, send an FCM push / SMS
+to open the check-in flow in the Flutter app.
 """
 
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any
 
 from app.core.database import get_db
 from app.services.notification_service import notify_patient
@@ -32,13 +22,6 @@ CHECKIN_TITLE = "Daily Wellness Check-In"
 CHECKIN_BODY = "Time for your daily check-in. How are you feeling today?"
 
 
-async def _acquire_db() -> Any:
-    candidate = get_db()
-    if hasattr(candidate, "__anext__"):
-        return await candidate.__anext__()
-    return candidate
-
-
 async def trigger_daily_checkins() -> None:
     """Entry point registered with APScheduler — runs every minute."""
     now_utc: datetime = datetime.now(timezone.utc)
@@ -46,38 +29,36 @@ async def trigger_daily_checkins() -> None:
 
     logger.debug("checkin_worker: running at %s", now_utc.isoformat())
 
-    try:
-        db = await _acquire_db()
-    except Exception as e:  # noqa: BLE001
-        logger.exception("checkin_worker: failed to acquire db: %s", e)
-        return
+    db = get_db()
 
-    patients_result = await (
+    # patient_profiles.id is what wellness_checkins.patient_id references
+    patients_result = (
         db.table("patient_profiles")
-        .select("patient_id, checkin_time, checkin_frequency, device_token")
+        .select("id, profile_id, checkin_time, checkin_frequency")
         .not_.is_("checkin_time", "null")
         .execute()
     )
 
-    patients = getattr(patients_result, "data", None) or []
+    patients = (patients_result.data or []) if patients_result else []
     if not patients:
         return
 
-    checkins_today_result = await (
+    checkins_today_result = (
         db.table("wellness_checkins")
         .select("patient_id")
-        .gte("created_at", f"{today_str}T00:00:00Z")
-        .lte("created_at", f"{today_str}T23:59:59Z")
+        .gte("completed_at", f"{today_str}T00:00:00Z")
+        .lte("completed_at", f"{today_str}T23:59:59Z")
         .execute()
     )
     already_checked_in: set[str] = {
-        row["patient_id"] for row in (getattr(checkins_today_result, "data", None) or [])
+        row["patient_id"]
+        for row in ((checkins_today_result.data or []) if checkins_today_result else [])
     }
 
     triggered: list[str] = []
 
     for patient in patients:
-        patient_id: str = patient["patient_id"]
+        patient_id: str = patient["id"]  # patient_profiles.id
         if patient_id in already_checked_in:
             continue
 
@@ -86,7 +67,7 @@ async def trigger_daily_checkins() -> None:
             continue
 
         try:
-            parts = checkin_time_str.split(":")
+            parts = str(checkin_time_str).split(":")
             scheduled_hour = int(parts[0])
             scheduled_minute = int(parts[1])
         except (IndexError, ValueError):
@@ -98,11 +79,8 @@ async def trigger_daily_checkins() -> None:
             continue
 
         scheduled_dt = datetime(
-            now_utc.year,
-            now_utc.month,
-            now_utc.day,
-            scheduled_hour,
-            scheduled_minute,
+            now_utc.year, now_utc.month, now_utc.day,
+            scheduled_hour, scheduled_minute,
             tzinfo=timezone.utc,
         )
 
@@ -112,9 +90,7 @@ async def trigger_daily_checkins() -> None:
 
         logger.info(
             "Triggering check-in for patient=%s (checkin_time=%s, delta=%.1fs)",
-            patient_id,
-            checkin_time_str,
-            delta_seconds,
+            patient_id, checkin_time_str, delta_seconds,
         )
 
         try:
@@ -122,10 +98,7 @@ async def trigger_daily_checkins() -> None:
                 patient_id=patient_id,
                 title=CHECKIN_TITLE,
                 body=CHECKIN_BODY,
-                data={
-                    "action": "open_checkin",
-                    "patient_id": patient_id,
-                },
+                data={"action": "open_checkin", "patient_id": patient_id},
             )
             triggered.append(patient_id)
         except Exception as exc:  # noqa: BLE001

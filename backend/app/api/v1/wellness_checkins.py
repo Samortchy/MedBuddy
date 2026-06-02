@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from supabase import Client
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime, timezone, date
 
@@ -7,6 +8,15 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_patient
 
 router = APIRouter(prefix="/wellness-checkins", tags=["Wellness Check-ins"])
+
+
+class WellnessCheckInCreate(BaseModel):
+    mood_score: Optional[int] = Field(None, ge=1, le=5)
+    energy_score: Optional[int] = Field(None, ge=1, le=5)
+    pain_level: Optional[int] = Field(None, ge=1, le=5)
+    sleep_quality: Optional[int] = Field(None, ge=1, le=5)
+    meds_confirmed: Optional[bool] = None
+    raw_summary: Optional[str] = None
 
 
 # ─── GET /wellness-checkins ───────────────────────────────────────────────────
@@ -88,3 +98,31 @@ async def get_wellness_checkin(
             detail="Access denied.",
         )
     return result.data
+
+
+# ─── POST /wellness-checkins ──────────────────────────────────────────────────
+
+@router.post("/", status_code=status.HTTP_201_CREATED, summary="Submit a wellness check-in")
+async def create_wellness_checkin(
+    payload: WellnessCheckInCreate,
+    current_user: dict = Depends(get_current_patient),
+    db: Client = Depends(get_db),
+):
+    insert_data: dict = {
+        "patient_id": current_user["patient_profile_id"],
+        "source": "patient",
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    for field in ("mood_score", "energy_score", "pain_level", "sleep_quality",
+                  "meds_confirmed", "raw_summary"):
+        val = getattr(payload, field)
+        if val is not None:
+            insert_data[field] = val
+
+    result = db.table("wellness_checkins").insert(insert_data).execute()
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create wellness check-in.",
+        )
+    return result.data[0]

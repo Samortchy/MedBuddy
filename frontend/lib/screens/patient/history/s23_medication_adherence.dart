@@ -36,8 +36,16 @@ class MedicationAdherenceScreen extends StatefulWidget {
 
 class _MedicationAdherenceScreenState extends State<MedicationAdherenceScreen> {
   String _selectedFilter = 'All';
-  DateTime _selectedDay = DateTime(2026, 4, 3);
-  DateTime _displayedMonth = DateTime(2026, 4, 1);
+  late DateTime _selectedDay;
+  late DateTime _displayedMonth;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _selectedDay = DateTime(now.year, now.month, now.day);
+    _displayedMonth = DateTime(now.year, now.month, 1);
+  }
 
   List<String> get _filterOptions => widget.medications.isEmpty
       ? ['All']

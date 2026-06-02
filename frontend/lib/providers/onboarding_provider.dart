@@ -136,6 +136,28 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
     state = state.copyWith(contacts: contacts);
   }
 
+  /// Pre-fill state from existing profile data so edit screens show real values.
+  void prefillFromProfile({
+    String? fullName,
+    int? age,
+    List<String>? conditions,
+    String? checkinTime,
+    int? checkinFrequency,
+  }) {
+    String? timeDisplay;
+    if (checkinTime != null) {
+      if (checkinTime.startsWith('08')) timeDisplay = 'Morning';
+      else if (checkinTime.startsWith('12')) timeDisplay = 'Midday';
+      else if (checkinTime.startsWith('18')) timeDisplay = 'Evening';
+    }
+    state = state.copyWith(
+      fullName: fullName ?? state.fullName,
+      age: age ?? state.age,
+      conditions: conditions ?? state.conditions,
+      checkinTime: timeDisplay ?? state.checkinTime,
+    );
+  }
+
   // S09
   void setCheckinPrefs({
     required String checkinTime,
@@ -160,8 +182,12 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
   }
 
   Future<void> _submitProfile() async {
+    // Calculate approximate date_of_birth from age (Jan 1 of birth year)
+    final birthYear = DateTime.now().year - state.age;
+    final dob = '$birthYear-01-01';
     await _dio.patch('/patient/profile', data: {
       'full_name': state.fullName,
+      'date_of_birth': dob,
       'mobility_level': _mobilityToApi(state.mobilityLevel),
       'cognitive_state': _cognitionToApi(state.cognitiveState),
       'checkin_time': _checkinTimeToApi(state.checkinTime),
@@ -170,6 +196,14 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
   }
 
   Future<void> _submitConditions() async {
+    // Delete all existing conditions first to avoid duplicates on re-submit
+    try {
+      final existing = await _dio.get('/health-conditions/');
+      final list = (existing.data as List<dynamic>? ?? []);
+      await Future.wait(
+        list.map((c) => _dio.delete('/health-conditions/${c['id']}')),
+      );
+    } catch (_) {}
     if (state.conditions.isEmpty) return;
     await Future.wait(state.conditions.map((name) => _dio.post(
           '/health-conditions/',
@@ -181,6 +215,14 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
   }
 
   Future<void> _submitContacts() async {
+    // Delete all existing contacts first to avoid duplicates on re-submit
+    try {
+      final existing = await _dio.get('/emergency-contacts/');
+      final list = (existing.data as List<dynamic>? ?? []);
+      await Future.wait(
+        list.map((c) => _dio.delete('/emergency-contacts/${c['id']}')),
+      );
+    } catch (_) {}
     if (state.contacts.isEmpty) return;
     await Future.wait(state.contacts.map((c) => _dio.post(
           '/emergency-contacts/',
@@ -194,6 +236,14 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
   }
 
   Future<void> _submitMedications() async {
+    // Delete all existing medications first to avoid duplicates on re-submit
+    try {
+      final existing = await _dio.get('/medications/');
+      final list = (existing.data as List<dynamic>? ?? []);
+      await Future.wait(
+        list.map((m) => _dio.delete('/medications/${m['id']}')),
+      );
+    } catch (_) {}
     if (state.medications.isEmpty) return;
     await Future.wait(
       state.medications.map(

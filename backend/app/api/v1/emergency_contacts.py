@@ -77,10 +77,9 @@ async def create_emergency_contact(
         .select("id")
         .eq("patient_id", patient_id)
         .eq("priority", payload.priority)
-        .maybe_single()
         .execute()
     )
-    is_update = priority_check.data is not None
+    is_update = len(priority_check.data or []) > 0
 
     # Only enforce the count limit when creating a genuinely new contact
     if not is_update:

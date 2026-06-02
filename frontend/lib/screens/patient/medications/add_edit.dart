@@ -103,6 +103,21 @@ class _AddEditMedicationState extends ConsumerState<AddEditMedication> {
 
   Future<void> _save() async {
     if (!_canSave) return;
+
+    if (!isEdit) {
+      final nameLower = _nameCtrl.text.trim().toLowerCase();
+      final exists = ref
+          .read(medicationProvider)
+          .medications
+          .any((m) => m.name.toLowerCase() == nameLower);
+      if (exists) {
+        setState(() {
+          _error = 'You already have this medication — edit it instead.';
+        });
+        return;
+      }
+    }
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -131,7 +146,8 @@ class _AddEditMedicationState extends ConsumerState<AddEditMedication> {
         await dio.post('/medications/', data: body);
       }
       if (!mounted) return;
-      ref.read(medicationProvider.notifier).refresh();
+      await ref.read(medicationProvider.notifier).refresh();
+      if (!mounted) return;
       Navigator.of(context).pop();
     } on DioException catch (e) {
       setState(() {

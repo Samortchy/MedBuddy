@@ -38,27 +38,7 @@ class _AIBuddyChatScreenState extends State<AIBuddyChatScreen> {
   bool _isAITyping = false;
 
   // Replace with real data from your state management layer
-  final List<ChatMessage> _messages = [
-    ChatMessage(
-      id: '1',
-      content: 'Good morning! How are you feeling today?',
-      isFromAI: true,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 10)),
-    ),
-    ChatMessage(
-      id: '2',
-      content: 'A bit tired today, to be honest.',
-      isFromAI: false,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 8)),
-    ),
-    ChatMessage(
-      id: '3',
-      content:
-          'I understand. Rest is so important for your recovery. Did you get enough sleep last night?',
-      isFromAI: true,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 7)),
-    ),
-  ];
+  final List<ChatMessage> _messages = [];
 
   final List<String> _quickReplies = ['Yes', 'No', 'Not sure', 'Tell me more'];
 
@@ -87,14 +67,20 @@ class _AIBuddyChatScreenState extends State<AIBuddyChatScreen> {
     });
     _scrollToBottom();
 
-    // TODO: Replace with real AI call
-    // final response = await widget.aiService?.sendMessage(text, history: _messages);
-    // For now simulates a delay
-    await Future.delayed(const Duration(seconds: 2));
+    String reply = 'Thank you for sharing that with me.';
+    if (widget.aiService != null) {
+      try {
+        reply = await widget.aiService!.sendMessage(text, history: _messages);
+      } catch (_) {
+        reply = 'Sorry, I could not connect right now.';
+      }
+    } else {
+      await Future.delayed(const Duration(seconds: 2));
+    }
 
     final aiMsg = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      content: 'Thank you for sharing that with me.',
+      content: reply,
       isFromAI: true,
       timestamp: DateTime.now(),
     );
@@ -105,7 +91,7 @@ class _AIBuddyChatScreenState extends State<AIBuddyChatScreen> {
         _isAITyping = false;
       });
       _scrollToBottom();
-      // TODO: widget.ttsService?.speak(aiMsg.content);
+      // TTS is opt-in — user taps speaker icon to hear a message, not auto-play
     }
   }
 
@@ -113,18 +99,18 @@ class _AIBuddyChatScreenState extends State<AIBuddyChatScreen> {
   Future<void> _toggleListening() async {
     if (_isListening) {
       setState(() => _isListening = false);
-      // TODO: final text = await widget.sttService?.stopListening();
-      // if (text != null) _sendTextMessage(text);
+      await widget.sttService?.stopListening();
     } else {
       setState(() => _isListening = true);
-      // TODO: widget.sttService?.startListening();
+      final text = await widget.sttService?.startListening() ?? '';
+      if (mounted) setState(() => _isListening = false);
+      if (text.isNotEmpty) _sendTextMessage(text);
     }
   }
 
-  // â”€â”€ Backend hook: toggle TTS mute â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> _toggleMute() async {
     setState(() => _isMuted = !_isMuted);
-    // TODO: widget.ttsService?.setMuted(_isMuted);
+    await widget.ttsService?.setMuted(_isMuted);
   }
 
   void _scrollToBottom() {
@@ -229,6 +215,36 @@ class _AIBuddyChatScreenState extends State<AIBuddyChatScreen> {
 
   // â”€â”€ Chat Area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Widget _buildChatArea() {
+    if (_messages.isEmpty && !_isAITyping) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(MedBuddyDimens.spacingXl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  color: MedBuddyColors.primarySoft,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.smart_toy_outlined,
+                    color: MedBuddyColors.primary, size: 28),
+              ),
+              const SizedBox(height: 12),
+              const Text('Hi! How are you feeling today?',
+                  style: MedBuddyTextStyles.bodyBold,
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 4),
+              Text('Type a message or tap the mic to speak.',
+                  style: MedBuddyTextStyles.secondary,
+                  textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      );
+    }
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(MedBuddyDimens.spacingMd),

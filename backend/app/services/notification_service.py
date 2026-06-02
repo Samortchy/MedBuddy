@@ -2,18 +2,23 @@ import asyncio
 import json
 import logging
 import os
+from datetime import datetime, time as dtime
 from threading import Lock
+from typing import Any, Literal
 
 import firebase_admin
 from firebase_admin import credentials, messaging
 from firebase_admin.exceptions import FirebaseError
 
 from app.core.config import settings
+from app.core.database import get_db
 from app.models.notification import PushResult
 
 logger = logging.getLogger(__name__)
 
 _init_lock = Lock()
+
+Channel = Literal["push", "sms", "both"]
 
 
 def _load_credentials() -> credentials.Certificate:
@@ -70,36 +75,20 @@ async def send_push(
 
 
 # ---------------------------------------------------------------------------
-# Preference-aware dispatchers (Menna — Tasks 24/25/26)
+# Preference-aware dispatchers
 # ---------------------------------------------------------------------------
 
-from datetime import datetime, time as dtime
-from typing import Any, Literal
-
-from app.core.database import get_db
-
-Channel = Literal["push", "sms", "both"]
-
-
-async def _acquire_db() -> Any:
-    """Match reminder_worker._acquire_db — handles get_db being an async-gen."""
-    candidate = get_db()
-    if hasattr(candidate, "__anext__"):
-        return await candidate.__anext__()
-    return candidate
-
-
-async def get_notification_preferences(patient_id: str) -> dict:
+def get_notification_preferences(patient_id: str) -> dict:
     """Return the notification_preferences row for a patient (defaults if none)."""
-    db = await _acquire_db()
-    result = await (
+    db = get_db()
+    result = (
         db.table("notification_preferences")
         .select("*")
         .eq("patient_id", patient_id)
         .maybe_single()
         .execute()
     )
-    if getattr(result, "data", None):
+    if result and result.data:
         return result.data
     return {
         "channel": "both",
@@ -110,7 +99,6 @@ async def get_notification_preferences(patient_id: str) -> dict:
 
 
 def _is_quiet_hours(prefs: dict) -> bool:
-    """Return True if current UTC time is within the patient's quiet window."""
     quiet_from = prefs.get("quiet_from")
     quiet_until = prefs.get("quiet_until")
     if not quiet_from or not quiet_until:
@@ -131,7 +119,6 @@ def _is_quiet_hours(prefs: dict) -> bool:
 
 
 async def _send_sms(phone: str, message: str) -> bool:
-    """Send SMS via Twilio. Returns True on success."""
     try:
         from twilio.rest import Client  # noqa: PLC0415
 
@@ -161,34 +148,30 @@ async def notify_patient(
 ) -> None:
     """Send a notification to a patient honouring channel preference + quiet hours.
 
-    force_sms=True bypasses quiet hours and channel preference (emergency).
+    patient_id is patient_profiles.id.
+    No device_token column exists yet — push is skipped; falls back to SMS if available.
     """
-    prefs = await get_notification_preferences(patient_id)
+    prefs = get_notification_preferences(patient_id)
 
     if not force_sms and _is_quiet_hours(prefs):
         logger.info("Skipping notification for patient=%s (quiet hours)", patient_id)
         return
 
     channel: Channel = prefs.get("channel", "both")
-    db = await _acquire_db()
+    db = get_db()
 
-    profile = await (
+    profile_result = (
         db.table("patient_profiles")
-        .select("device_token, profiles(phone)")
-        .eq("patient_id", patient_id)
-        .single()
+        .select("profile_id, profiles(phone)")
+        .eq("id", patient_id)
+        .maybe_single()
         .execute()
     )
-    patient_data = getattr(profile, "data", None) or {}
-    device_token: str | None = patient_data.get("device_token")
+    patient_data = (profile_result.data or {}) if profile_result else {}
     phone: str | None = (patient_data.get("profiles") or {}).get("phone")
 
-    push_ok = False
-    if channel in ("push", "both") and device_token and not force_sms:
-        result = await send_push(device_token, title, body, {str(k): str(v) for k, v in (data or {}).items()})
-        push_ok = result.success
-
-    if force_sms or channel in ("sms", "both") or not push_ok:
+    # No device_token column on patient_profiles yet — push skipped until Phase 4
+    if channel in ("sms", "both") or force_sms:
         if phone:
             await _send_sms(phone, f"{title}: {body}")
 
@@ -201,33 +184,28 @@ async def notify_caregivers(
     *,
     force_sms: bool = False,
 ) -> None:
-    """Notify all active caregivers linked to a patient via FCM + SMS."""
-    db = await _acquire_db()
-    links = await (
+    """Notify all active caregivers linked to a patient.
+
+    Looks up caregiver profiles via caregiver_patient_links.
+    Push skipped until Phase 4 (no device_token column yet); SMS attempted if phone on file.
+    """
+    db = get_db()
+    links_result = (
         db.table("caregiver_patient_links")
-        .select("caregiver_id, profiles(phone), patient_profiles!caregiver_id(device_token)")
+        .select("caregiver_id, profiles!caregiver_id(phone)")
         .eq("patient_id", patient_id)
         .eq("status", "active")
         .execute()
     )
 
-    for link in getattr(links, "data", None) or []:
+    for link in (links_result.data or []) if links_result else []:
         caregiver_id: str = link["caregiver_id"]
-        device_token: str | None = (link.get("patient_profiles") or {}).get("device_token")
         phone: str | None = (link.get("profiles") or {}).get("phone")
 
-        push_ok = False
-        if device_token:
-            result = await send_push(device_token, title, body, {str(k): str(v) for k, v in (data or {}).items()})
-            push_ok = result.success
-
-        if force_sms or not push_ok:
-            if phone:
-                await _send_sms(phone, f"{title}: {body}")
+        if force_sms and phone:
+            await _send_sms(phone, f"{title}: {body}")
 
         logger.info(
-            "Notified caregiver=%s for patient=%s push_ok=%s",
-            caregiver_id,
-            patient_id,
-            push_ok,
+            "notify_caregivers: caregiver=%s patient=%s sms_attempted=%s",
+            caregiver_id, patient_id, bool(phone and force_sms),
         )

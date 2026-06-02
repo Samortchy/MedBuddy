@@ -302,9 +302,11 @@ class _MedTile extends ConsumerWidget {
 
   String _formatTime(String raw) {
     try {
-      final parts = raw.split(':');
-      int h = int.parse(parts[0]);
-      final m = parts[1];
+      // Handle full ISO datetime (e.g. 2026-06-02T08:00:00+00:00)
+      // Use UTC hour to match how doses are bucketed
+      final dt = DateTime.parse(raw).toUtc();
+      int h = dt.hour;
+      final m = dt.minute.toString().padLeft(2, '0');
       final suffix = h >= 12 ? 'PM' : 'AM';
       if (h > 12) h -= 12;
       if (h == 0) h = 12;

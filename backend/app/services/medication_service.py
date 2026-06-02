@@ -62,8 +62,11 @@ async def generate_doses_for_patient(
                     tzinfo=timezone.utc,
                 )
 
-                # Include doses from up to 1 hour ago to catch just-missed ones
-                if scheduled_at >= now - timedelta(hours=1):
+                # Always include all doses for the start date so newly added
+                # medications appear immediately regardless of current time.
+                # For subsequent days only include future doses.
+                is_start_date = (current_day == max(now.date(), start_date))
+                if is_start_date or scheduled_at >= now - timedelta(hours=1):
                     doses_to_insert.append({
                         "medication_id": medication_id,
                         "scheduled_at": scheduled_at.isoformat(),

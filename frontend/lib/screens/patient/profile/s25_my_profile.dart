@@ -14,46 +14,18 @@ import '../../../widgets/shared/bottom_nav_bar.dart';
 /// - [onGenerateInvite]  → Call to generate a 6-digit caregiver invite code
 /// - [onRevokeCaregiver] → Call with caregiver ID to revoke access
 class MyProfileScreen extends StatelessWidget {
-  final PatientProfile? profile;
+  final PatientProfile profile;
   final ValueChanged<String>? onEditSection;
   final Future<String> Function()? onGenerateInvite;
   final ValueChanged<String>? onRevokeCaregiver;
 
   const MyProfileScreen({
     super.key,
-    this.profile,
+    required this.profile,
     this.onEditSection,
     this.onGenerateInvite,
     this.onRevokeCaregiver,
   });
-
-  // Placeholder profile — remove when real data is wired
-  PatientProfile get _displayProfile =>
-      profile ??
-      const PatientProfile(
-        id: 'placeholder',
-        fullName: 'Arthur Mitchell',
-        age: 72,
-        gender: 'Male',
-        language: 'English',
-        conditions: ['Type 2 Diabetes', 'Hypertension'],
-        medications: [],
-        primaryContactName: 'Sarah Mitchell',
-        primaryContactPhone: '+1 (555) 012-3456',
-        primaryContactRelationship: 'Daughter',
-        checkInHour: 9,
-        checkInVoiceMode: true,
-        painBaseline: 2,
-        caregivers: [
-          CaregiverLink(
-            id: 'cg1',
-            name: 'Sarah Mitchell',
-            relationship: 'Daughter',
-            initials: 'SM',
-          ),
-        ],
-        profileCompleteness: 85,
-      );
 
   void _handleGenerateInvite(BuildContext context) async {
     if (onGenerateInvite == null) {
@@ -92,7 +64,7 @@ class MyProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = _displayProfile;
+    final p = profile;
     return Scaffold(
       backgroundColor: MedBuddyColors.warmWhite,
       body: Stack(
@@ -145,20 +117,24 @@ class MyProfileScreen extends StatelessWidget {
                             iconColor: MedBuddyColors.primary,
                             onEdit: () => onEditSection?.call('medications'),
                             children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    p.medications.isEmpty
-                                        ? 'No medications added'
-                                        : p.medications
-                                            .map((m) => m.name)
-                                            .join(', '),
-                                    style: MedBuddyTextStyles.label.copyWith(
-                                        color: MedBuddyColors.slate700),
-                                  ),
-                                  if (p.medications.isNotEmpty)
+                              if (p.medications.isEmpty)
+                                Text(
+                                  'No medications added',
+                                  style: MedBuddyTextStyles.label.copyWith(
+                                      color: MedBuddyColors.slate700),
+                                )
+                              else
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: p.medications
+                                          .map((m) => _chip(m.name))
+                                          .toList(),
+                                    ),
+                                    const SizedBox(height: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 10, vertical: 3),
@@ -167,15 +143,15 @@ class MyProfileScreen extends StatelessWidget {
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
-                                          '${p.medications.length} active',
-                                          style: MedBuddyTextStyles.caption
-                                              .copyWith(
-                                                  color:
-                                                      MedBuddyColors.pureWhite,
-                                                  fontWeight: FontWeight.w700)),
+                                        '${p.medications.length} active',
+                                        style: MedBuddyTextStyles.caption
+                                            .copyWith(
+                                                color: MedBuddyColors.pureWhite,
+                                                fontWeight: FontWeight.w700),
+                                      ),
                                     ),
-                                ],
-                              ),
+                                  ],
+                                ),
                             ],
                           ),
                           const SizedBox(height: MedBuddyDimens.spacingMd),
