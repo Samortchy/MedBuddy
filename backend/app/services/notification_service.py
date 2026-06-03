@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -22,10 +23,20 @@ Channel = Literal["push", "sms", "both"]
 
 
 def _load_credentials() -> credentials.Certificate:
-    raw = settings.FIREBASE_CREDENTIALS_JSON
-    if raw and os.path.isfile(raw):
+    raw = settings.firebase_service_account_json
+    if not raw:
+        raise ValueError(
+            "FIREBASE_SERVICE_ACCOUNT_JSON is not configured in backend/.env."
+        )
+    # A path to a JSON file?
+    if os.path.isfile(raw):
         return credentials.Certificate(raw)
-    cred_dict = json.loads(raw)
+    # Base64-encoded JSON (preferred), or a raw JSON string as a fallback.
+    try:
+        decoded = base64.b64decode(raw).decode("utf-8")
+        cred_dict = json.loads(decoded)
+    except Exception:
+        cred_dict = json.loads(raw)
     return credentials.Certificate(cred_dict)
 
 
@@ -181,31 +192,40 @@ async def notify_caregivers(
     title: str,
     body: str,
     data: dict | None = None,
-    *,
-    force_sms: bool = False,
-) -> None:
-    """Notify all active caregivers linked to a patient.
+) -> int:
+    """Send an FCM push to every device of every active caregiver linked to a patient.
 
-    Looks up caregiver profiles via caregiver_patient_links.
-    Push skipped until Phase 4 (no device_token column yet); SMS attempted if phone on file.
+    Returns the number of pushes attempted. Never raises.
     """
     db = get_db()
     links_result = (
         db.table("caregiver_patient_links")
-        .select("caregiver_id, profiles!caregiver_id(phone)")
+        .select("caregiver_id")
         .eq("patient_id", patient_id)
         .eq("status", "active")
         .execute()
     )
 
-    for link in (links_result.data or []) if links_result else []:
+    # FCM data values must all be strings.
+    str_data = {k: str(v) for k, v in (data or {}).items()}
+    sent = 0
+
+    for link in (links_result.data or []):
         caregiver_id: str = link["caregiver_id"]
-        phone: str | None = (link.get("profiles") or {}).get("phone")
+        try:
+            tokens = (
+                db.table("fcm_tokens")
+                .select("token")
+                .eq("user_id", caregiver_id)
+                .execute()
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("fcm_tokens lookup failed for %s: %s", caregiver_id, e)
+            continue
 
-        if force_sms and phone:
-            await _send_sms(phone, f"{title}: {body}")
+        for row in (tokens.data or []):
+            await send_push(row["token"], title, body, str_data)
+            sent += 1
 
-        logger.info(
-            "notify_caregivers: caregiver=%s patient=%s sms_attempted=%s",
-            caregiver_id, patient_id, bool(phone and force_sms),
-        )
+    logger.info("notify_caregivers: patient=%s pushes=%s", patient_id, sent)
+    return sent

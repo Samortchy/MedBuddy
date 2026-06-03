@@ -12,7 +12,9 @@ router = APIRouter(prefix="/caregiver", tags=["Caregiver"])
 
 _INVITE_EXPIRY_HOURS = 24
 _CODE_LENGTH = 6
-_CODE_CHARS = string.ascii_uppercase + string.digits
+# Digits only — the caregiver "Enter Invite Code" screen uses a numeric keypad,
+# and all UI copy says "6-digit code".
+_CODE_CHARS = string.digits
 
 
 def _generate_invite_code() -> str:
@@ -111,6 +113,18 @@ async def accept_caregiver_invite(
 
     caregiver_id = current_user["profile_id"]
 
+    # Ensure the caregiver has a profiles row (FK target for the link).
+    # Caregiver accounts don't get a profiles row at signup, so create one here.
+    existing_profile = (
+        db.table("profiles").select("id").eq("id", caregiver_id).execute()
+    )
+    if not existing_profile.data:
+        db.table("profiles").insert({
+            "id": caregiver_id,
+            "role": "caregiver",
+            "full_name": current_user.get("full_name") or "Caregiver",
+        }).execute()
+
     # Table: caregiver_patient_links (not caregiver_patients)
     existing = (
         db.table("caregiver_patient_links")
@@ -185,18 +199,142 @@ async def get_caregiver_patients(
     for row in (result.data or []):
         patient_profile = row.get("patient_profiles") or {}
         profile = patient_profile.get("profiles") or {}
+        patient_id = row["patient_id"]
+
+        # Most recent completed wellness check-in (for the status line).
+        last = (
+            db.table("wellness_checkins")
+            .select("completed_at")
+            .eq("patient_id", patient_id)
+            .not_.is_("completed_at", "null")
+            .order("completed_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        last_checkin_at = last.data[0]["completed_at"] if last.data else None
+
         patients.append({
-            "patient_profile_id": row["patient_id"],
+            "patient_profile_id": patient_id,
             "full_name": profile.get("full_name"),
             "phone": profile.get("phone"),
             "date_of_birth": profile.get("date_of_birth"),
             "linked_at": row["linked_at"],
+            "last_checkin_at": last_checkin_at,
         })
 
     return {
         "patients": patients,
         "total": len(patients),
     }
+
+
+# ─── Caregiver → linked-patient detail views ──────────────────────────────────
+
+def _verify_linked(db: Client, caregiver_id: str, patient_id: str) -> None:
+    """Raise 403 unless an active link exists between this caregiver and patient."""
+    link = (
+        db.table("caregiver_patient_links")
+        .select("id")
+        .eq("caregiver_id", caregiver_id)
+        .eq("patient_id", patient_id)
+        .eq("status", "active")
+        .execute()
+    )
+    if not link.data:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not linked to this patient.",
+        )
+
+
+@router.get(
+    "/patients/{patient_id}/profile",
+    summary="Get a linked patient's full profile (caregiver only)",
+)
+async def get_patient_profile_for_caregiver(
+    patient_id: str,
+    current_user: dict = Depends(get_current_caregiver),
+    db: Client = Depends(get_db),
+):
+    _verify_linked(db, current_user["profile_id"], patient_id)
+    result = (
+        db.table("patient_profiles")
+        .select("*, profiles(*)")
+        .eq("id", patient_id)
+        .single()
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Patient profile not found.",
+        )
+    data = result.data.copy()
+    profile = data.pop("profiles", {}) or {}
+    return {**profile, **data}
+
+
+@router.get(
+    "/patients/{patient_id}/medications",
+    summary="Get a linked patient's active medications (caregiver only)",
+)
+async def get_patient_medications_for_caregiver(
+    patient_id: str,
+    current_user: dict = Depends(get_current_caregiver),
+    db: Client = Depends(get_db),
+):
+    _verify_linked(db, current_user["profile_id"], patient_id)
+    result = (
+        db.table("medications")
+        .select("*, medication_schedules(*)")
+        .eq("patient_id", patient_id)
+        .is_("deleted_at", "null")
+        .order("created_at", desc=False)
+        .execute()
+    )
+    return result.data or []
+
+
+@router.get(
+    "/patients/{patient_id}/wellness-checkins",
+    summary="Get a linked patient's recent wellness check-ins (caregiver only)",
+)
+async def get_patient_wellness_for_caregiver(
+    patient_id: str,
+    current_user: dict = Depends(get_current_caregiver),
+    db: Client = Depends(get_db),
+):
+    _verify_linked(db, current_user["profile_id"], patient_id)
+    result = (
+        db.table("wellness_checkins")
+        .select("*")
+        .eq("patient_id", patient_id)
+        .order("completed_at", desc=True)
+        .limit(30)
+        .execute()
+    )
+    return result.data or []
+
+
+@router.get(
+    "/patients/{patient_id}/emergency-events",
+    summary="Get a linked patient's emergency events (caregiver only)",
+)
+async def get_patient_emergencies_for_caregiver(
+    patient_id: str,
+    current_user: dict = Depends(get_current_caregiver),
+    db: Client = Depends(get_db),
+):
+    _verify_linked(db, current_user["profile_id"], patient_id)
+    result = (
+        db.table("emergency_events")
+        .select("*, emergency_escalation_steps(*)")
+        .eq("patient_id", patient_id)
+        .order("triggered_at", desc=True)
+        .limit(50)
+        .execute()
+    )
+    return result.data or []
 
 
 # ─── GET /caregiver/my-caregivers ─────────────────────────────────────────────

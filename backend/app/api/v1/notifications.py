@@ -1,16 +1,49 @@
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
+from pydantic import BaseModel
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_patient
+from app.core.dependencies import get_current_patient, get_current_user
 from app.models.notification import (
     NotificationPreferencesOut,
     NotificationPreferencesPatch,
 )
 
 router = APIRouter(prefix="/patient", tags=["Notification Preferences"])
+
+
+class FcmTokenIn(BaseModel):
+    token: str
+    platform: Optional[str] = None
+
+
+@router.post(
+    "/fcm-token",
+    summary="Register/refresh this device's FCM token (patient or caregiver)",
+)
+async def register_fcm_token(
+    payload: FcmTokenIn,
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    if not payload.token.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="token is required.",
+        )
+    db.table("fcm_tokens").upsert(
+        {
+            "user_id": current_user["profile_id"],
+            "token": payload.token,
+            "platform": payload.platform,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+        on_conflict="token",
+    ).execute()
+    return {"status": "ok"}
 
 
 @router.get(

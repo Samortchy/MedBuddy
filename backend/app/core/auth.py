@@ -74,12 +74,15 @@ async def verify_jwt(token: str, db: Client) -> dict:
 
     logger.info(f"JWT verified | sub={profile_id} role={role}")
 
+    full_name = user_metadata.get("full_name") or app_metadata.get("full_name")
+
     # Caregivers have no patient_profile row — return early
     if role == "caregiver":
         return {
             "profile_id": profile_id,
             "patient_profile_id": None,
             "role": "caregiver",
+            "full_name": full_name,
         }
 
     result = (
@@ -102,4 +105,5 @@ async def verify_jwt(token: str, db: Client) -> dict:
         "profile_id": profile_id,
         "patient_profile_id": result.data["id"],
         "role": role,
+        "full_name": full_name,
     }

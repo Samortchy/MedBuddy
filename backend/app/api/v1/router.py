@@ -13,6 +13,8 @@ from app.api.v1 import (
     visit_summaries,
     emergency_events,
     wellness_checkins,
+    emergency,
+    agora,
 )
 
 router = APIRouter()
@@ -30,3 +32,5 @@ router.include_router(symptom_logs.router)
 router.include_router(visit_summaries.router)
 router.include_router(emergency_events.router)
 router.include_router(wellness_checkins.router)
+router.include_router(emergency.router)
+router.include_router(agora.router)
