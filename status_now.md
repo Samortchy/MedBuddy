@@ -1,7 +1,7 @@
 # MedBuddy — Current Status Snapshot
-> Last updated: 2026-06-02 | Phase 2 + Pre-Phase-3 bug batch (A/B/C/D) complete | Branch: main
+> Last updated: 2026-06-03 | ALL phases done (0–6 + bug batch A–D + messaging) | Branch: main
 >
-> See `CLAUDE.md` for the full pre-Phase-3 bug batch (7 bugs + 2 bonus fixes + Phase D polish) — Phases A, B, C, D done. Phase 3+ (Emergency/Agora, FCM) remain.
+> Phases 0,1,2,A,B,C,D,3,4a,4b,5a,5b,6 complete, plus caregiver↔patient messaging, SOS-everywhere, logout, multi-device base URL. Optional polish remains (alerts feed c03, message push, wellness check-in pain/sleep capture).
 
 ---
 
@@ -25,7 +25,9 @@
 | Phase 4a | Caregiver detail views (meds/wellness/emergencies/profile + last check-in) | ✅ Done |
 | Phase 4b | FCM push (token reg + emergency push + caregiver call join) | ✅ Done — run sql/08 + full rebuild |
 | Messaging | Real caregiver↔patient chat (uses existing caregiver_messages table) | ✅ Done — patient chat hub (AI + Caregiver tabs), caregiver Messages tab |
-| Phase 4 | Caregiver detail endpoints + FCM | ❌ Not started |
+| Phase 5a | AI visit summary from transcript (POST /visit-summaries/process-transcript) | ✅ Done — s29 "Summarize with AI" |
+| Phase 5b | Symptom AI severity flagging (keyword + LLM) + caregiver alert on flagged | ✅ Done — s28 shows badges; no SQL (columns exist) |
+| Phase 6 | Hardening: rate limiting (slowapi), request logging, health checks, configurable creds | ✅ Done |
 | Phase 5 | AI visit summaries + symptom flagging | ❌ Not started |
 | Phase 6 | Rate limiting + production hardening | ❌ Not started |
 

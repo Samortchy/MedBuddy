@@ -92,8 +92,17 @@ void _handleEmergencyMessage(RemoteMessage message) {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(
-    url: 'https://tcyrehuatbtlfvnttkgc.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjeXJlaHVhdGJ0bGZ2bnR0a2djIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1ODI3NzUsImV4cCI6MjA5MzE1ODc3NX0.MJsuJRl0GDqKo1a-eVBYNEjrD98DHG2g0F6Pcz5RkC8',
+    // Overridable via --dart-define=SUPABASE_URL=... / SUPABASE_ANON_KEY=...
+    // (anon key is a public client key; safe to ship, but keep it configurable).
+    url: const String.fromEnvironment(
+      'SUPABASE_URL',
+      defaultValue: 'https://tcyrehuatbtlfvnttkgc.supabase.co',
+    ),
+    anonKey: const String.fromEnvironment(
+      'SUPABASE_ANON_KEY',
+      defaultValue:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjeXJlaHVhdGJ0bGZ2bnR0a2djIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1ODI3NzUsImV4cCI6MjA5MzE1ODc3NX0.MJsuJRl0GDqKo1a-eVBYNEjrD98DHG2g0F6Pcz5RkC8',
+    ),
   );
 
   // Firebase / FCM — don't let init failure crash the app.
@@ -129,6 +138,16 @@ class MedBuddyApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
       ),
+      // Respect the OS font-size setting, but cap it so very large
+      // accessibility fonts can't overflow layouts on any device.
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        final factor = mq.textScaler.scale(1.0).clamp(1.0, 1.3).toDouble();
+        return MediaQuery(
+          data: mq.copyWith(textScaler: TextScaler.linear(factor)),
+          child: child!,
+        );
+      },
       home: const AuthGate(),
       routes: {
         // ── Onboarding ────────────────────────────────────────────────

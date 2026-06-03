@@ -3,11 +3,13 @@ from supabase import Client
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timezone, date
+import logging
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_patient
 
 router = APIRouter(prefix="/visit-summaries", tags=["Visit Summaries"])
+logger = logging.getLogger(__name__)
 
 
 # ─── Models ───────────────────────────────────────────────────────────────────
@@ -29,6 +31,11 @@ class VisitSummaryUpdate(BaseModel):
     instructions: Optional[str] = None
     next_appointment: Optional[date] = None
     audio_url: Optional[str] = None
+
+
+class TranscriptIn(BaseModel):
+    raw_transcript: str
+    appointment_id: Optional[str] = None
 
 
 # ─── GET /visit-summaries ─────────────────────────────────────────────────────
@@ -104,6 +111,70 @@ async def create_visit_summary(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create visit summary.",
+        )
+    return result.data[0]
+
+
+# ─── POST /visit-summaries/process-transcript (AI) ───────────────────────────
+
+@router.post(
+    "/process-transcript",
+    status_code=status.HTTP_201_CREATED,
+    summary="AI: structure a raw visit transcript into a saved visit summary",
+)
+async def process_transcript(
+    payload: TranscriptIn,
+    current_user: dict = Depends(get_current_patient),
+    db: Client = Depends(get_db),
+):
+    """
+    Sends the raw transcript to the LLM to extract diagnosis, medication
+    changes, instructions, and next appointment, then saves a visit summary.
+    If the LLM is unavailable, the raw transcript is still saved.
+    """
+    transcript = payload.raw_transcript.strip()
+    if not transcript:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="raw_transcript must not be empty.",
+        )
+
+    extracted: dict = {}
+    try:
+        from app.services import llm_service
+        extracted = await llm_service.extract_visit_summary(transcript)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Visit-summary extraction failed (saving raw only): %s", e)
+
+    insert_data: dict = {
+        "patient_id": current_user["patient_profile_id"],
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
+        "raw_transcript": transcript,
+    }
+    if payload.appointment_id:
+        insert_data["appointment_id"] = payload.appointment_id
+    if extracted.get("diagnosis"):
+        insert_data["diagnosis"] = extracted["diagnosis"]
+    if extracted.get("medications_changed"):
+        insert_data["medications_changed"] = extracted["medications_changed"]
+    if extracted.get("instructions"):
+        insert_data["instructions"] = extracted["instructions"]
+
+    # Validate the LLM's date before storing.
+    raw_date = extracted.get("next_appointment")
+    if raw_date:
+        try:
+            insert_data["next_appointment"] = date.fromisoformat(
+                str(raw_date)[:10]
+            ).isoformat()
+        except (ValueError, TypeError):
+            pass
+
+    result = db.table("visit_summaries").insert(insert_data).execute()
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save visit summary.",
         )
     return result.data[0]
 

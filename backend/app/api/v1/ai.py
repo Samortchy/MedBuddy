@@ -8,13 +8,14 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import Response
 from pydantic import BaseModel
 from supabase import Client
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_patient, get_current_user
+from app.core.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,9 @@ class TTSRequest(BaseModel):
     "/stt",
     summary="Transcribe audio to text (faster-whisper large-v3-turbo)",
 )
+@limiter.limit("10/minute")
 async def speech_to_text(
+    request: Request,
     audio: UploadFile = File(..., description="Audio file (WAV, WebM, M4A, MP3)"),
     language: Optional[str] = Form(None, description="ISO-639-1 language hint, e.g. 'ar' or 'en'"),
     current_user: dict = Depends(get_current_user),
@@ -179,7 +182,9 @@ def _build_patient_context(patient_profile_id: str, db: Client) -> Optional[str]
     response_model=ChatResponse,
     summary="Send a message to the MedBuddy AI (Llama 3.3 70B via OpenRouter)",
 )
+@limiter.limit("10/minute")
 async def chat(
+    request: Request,
     payload: ChatRequest,
     current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),

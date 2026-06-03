@@ -36,17 +36,11 @@ class _VisitSummaryNotifier
     }
   }
 
-  Future<void> add({
-    required String rawTranscript,
-    String? diagnosis,
-    String? medicationsChanged,
-    String? instructions,
-  }) async {
-    final body = <String, dynamic>{'raw_transcript': rawTranscript};
-    if (diagnosis != null) body['diagnosis'] = diagnosis;
-    if (medicationsChanged != null) body['medications_changed'] = medicationsChanged;
-    if (instructions != null) body['instructions'] = instructions;
-    await _dio.post('/visit-summaries/', data: body);
+  /// Sends the raw transcript to the AI endpoint, which extracts diagnosis,
+  /// medication changes, instructions, and next appointment, then saves it.
+  Future<void> processTranscript(String rawTranscript) async {
+    await _dio.post('/visit-summaries/process-transcript',
+        data: {'raw_transcript': rawTranscript});
     await fetch();
   }
 }
@@ -84,7 +78,7 @@ class _VisitSummaryScreenState extends ConsumerState<VisitSummaryScreen> {
       _saveError = null;
     });
     try {
-      await ref.read(_visitSummaryProvider.notifier).add(rawTranscript: text);
+      await ref.read(_visitSummaryProvider.notifier).processTranscript(text);
       if (mounted) {
         _notesCtrl.clear();
         setState(() => _isSaving = false);
@@ -226,13 +220,20 @@ class _VisitSummaryScreenState extends ConsumerState<VisitSummaryScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.note_add_outlined,
+              const Icon(Icons.auto_awesome,
                   color: MedBuddyColors.primary, size: 18),
               const SizedBox(width: 8),
               Text('New Visit Note',
                   style: MedBuddyTextStyles.bodyBold
                       .copyWith(color: MedBuddyColors.primaryDark)),
             ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'AI will pull out the diagnosis, medication changes, instructions, '
+            'and your next appointment.',
+            style: MedBuddyTextStyles.caption
+                .copyWith(color: MedBuddyColors.slate500),
           ),
           const SizedBox(height: MedBuddyDimens.spacingMd),
           TextField(
@@ -286,7 +287,7 @@ class _VisitSummaryScreenState extends ConsumerState<VisitSummaryScreen> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2.5, color: Colors.white),
                     )
-                  : Text('Save Note',
+                  : Text('Summarize with AI',
                       style: MedBuddyTextStyles.bodyBold
                           .copyWith(color: MedBuddyColors.pureWhite)),
             ),

@@ -109,6 +109,17 @@ List<EmergencyStep> _parseSteps(dynamic raw) {
 
 // ── Symptom logs ──────────────────────────────────────────────────────────────
 
+SymptomSeverity _severityFrom(String? s) {
+  switch (s) {
+    case 'flagged':
+      return SymptomSeverity.flagged;
+    case 'watch':
+      return SymptomSeverity.watch;
+    default:
+      return SymptomSeverity.normal;
+  }
+}
+
 class SymptomLogNotifier extends StateNotifier<AsyncValue<List<SymptomEntry>>> {
   final Dio _dio;
 
@@ -133,7 +144,7 @@ class SymptomLogNotifier extends StateNotifier<AsyncValue<List<SymptomEntry>>> {
           id: m['id'] as String,
           description: m['body'] as String? ?? '',
           timestamp: ts,
-          severity: SymptomSeverity.normal,
+          severity: _severityFrom(m['ai_severity'] as String?),
         );
       }).toList();
       state = AsyncValue.data(entries);

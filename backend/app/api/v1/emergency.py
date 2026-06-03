@@ -10,12 +10,13 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from supabase import Client
 from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_patient
+from app.core.limiter import limiter
 from app.services import agora_service
 
 router = APIRouter(prefix="/emergency", tags=["Emergency"])
@@ -56,7 +57,9 @@ def _channel_for(event_id: str) -> str:
     status_code=status.HTTP_201_CREATED,
     summary="Trigger an emergency (fall detection or manual SOS)",
 )
+@limiter.limit("3/minute")
 async def trigger_emergency(
+    request: Request,
     payload: EmergencyTriggerRequest,
     current_user: dict = Depends(get_current_patient),
     db: Client = Depends(get_db),

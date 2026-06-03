@@ -7,7 +7,9 @@ No extra packages needed.
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from typing import Optional
 
 import httpx
@@ -87,3 +89,67 @@ async def chat(
     reply = data["choices"][0]["message"]["content"]
     logger.info("LLM reply (%d chars)", len(reply))
     return reply.strip()
+
+
+# ── Structured helpers (Phase 5) ──────────────────────────────────────────────
+
+def _parse_json(text: str) -> dict:
+    """Best-effort parse of a JSON object from an LLM reply (tolerates fences/prose)."""
+    try:
+        return json.loads(text)
+    except Exception:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception:
+                pass
+    return {}
+
+
+async def extract_visit_summary(transcript: str) -> dict:
+    """
+    Turn a raw doctor-visit transcript into structured fields.
+
+    Returns {diagnosis, medications_changed, instructions, next_appointment}.
+    Values may be None/empty if not present in the transcript.
+    """
+    system_prompt = (
+        "You are a careful medical scribe. From the doctor-visit transcript, "
+        "extract a structured summary. Respond with ONLY a JSON object with "
+        'these exact keys: "diagnosis" (string), "medications_changed" (string), '
+        '"instructions" (string), "next_appointment" (date as YYYY-MM-DD or null). '
+        "Use an empty string or null when something is not mentioned. "
+        "Do not invent information. Output JSON only, no prose, no code fences."
+    )
+    reply = await chat(message=transcript, system_prompt=system_prompt)
+    data = _parse_json(reply)
+    return {
+        "diagnosis": data.get("diagnosis") or None,
+        "medications_changed": data.get("medications_changed") or None,
+        "instructions": data.get("instructions") or None,
+        "next_appointment": data.get("next_appointment") or None,
+    }
+
+
+async def assess_symptom(text: str) -> dict:
+    """
+    Triage a free-text symptom. Returns {severity, summary}.
+    severity ∈ {normal, watch, flagged}.
+    """
+    system_prompt = (
+        "You are a triage assistant for an elderly-care app. Classify the "
+        "patient's symptom description by severity. Respond with ONLY a JSON "
+        'object: {"severity": "normal" | "watch" | "flagged", '
+        '"summary": "<one short sentence>"}. '
+        "Use 'flagged' for anything urgent or dangerous (chest pain, trouble "
+        "breathing, stroke signs, severe bleeding, fainting, suicidal thoughts). "
+        "Use 'watch' for moderate concerns worth monitoring, and 'normal' for "
+        "mild/routine complaints. Output JSON only."
+    )
+    reply = await chat(message=text, system_prompt=system_prompt)
+    data = _parse_json(reply)
+    severity = str(data.get("severity") or "normal").lower().strip()
+    if severity not in ("normal", "watch", "flagged"):
+        severity = "watch"
+    return {"severity": severity, "summary": data.get("summary") or ""}

@@ -1,11 +1,11 @@
 {
-    "name": "flutter_application_1",
-    "short_name": "flutter_application_1",
+    "name": "MedBuddy",
+    "short_name": "MedBuddy",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0D9488",
+    "theme_color": "#0D9488",
+    "description": "AI-powered medical companion for elderly care.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

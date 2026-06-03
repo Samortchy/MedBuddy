@@ -4,7 +4,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import asyncio
 import logging
+import time
+
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
 from app.api.v1 import router
+from app.core.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +48,28 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ── Rate limiting (Phase 6) ───────────────────────────────────────────────────
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+
+# ── Request logging middleware (Phase 6) ──────────────────────────────────────
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    logger.info(
+        "%s %s -> %s (%.1f ms)",
+        request.method,
+        request.url.path,
+        response.status_code,
+        elapsed_ms,
+    )
+    return response
+
+
 app.include_router(router.router, prefix="/api/v1")
 
 
@@ -63,5 +92,28 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 @app.get("/health", tags=["Health"])
-def health():
-    return {"status": "ok", "service": "MedBuddy API"}
+async def health():
+    """Liveness + dependency checks for Supabase and the LLM provider."""
+    from app.core.config import settings
+
+    openrouter = (
+        "configured"
+        if settings.openrouter_api_key
+        and settings.openrouter_api_key != "your-openrouter-api-key"
+        else "missing"
+    )
+
+    supabase_status = "ok"
+    try:
+        from app.core.database import get_db
+        get_db().table("profiles").select("id").limit(1).execute()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Health check: Supabase unreachable: %s", e)
+        supabase_status = "down"
+
+    return {
+        "status": "ok",
+        "service": "MedBuddy API",
+        "supabase": supabase_status,
+        "openrouter": openrouter,
+    }

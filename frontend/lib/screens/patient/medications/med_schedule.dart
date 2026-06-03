@@ -74,6 +74,35 @@ class MedicationSchedule extends ConsumerWidget {
             ],
           ),
           const SOSButton(),
+          // Add-medication button — mirrors the SOS button on the left so it
+          // sits above the bottom nav instead of over the profile tab.
+          Positioned(
+            bottom: MedBuddyDimens.sosBottomOffset,
+            left: MedBuddyDimens.spacingLg,
+            child: GestureDetector(
+              onTap: () async {
+                await Navigator.of(context).pushNamed('/add-medication');
+                ref.read(medicationProvider.notifier).refresh();
+              },
+              child: Container(
+                width: MedBuddyDimens.sosButtonSize,
+                height: MedBuddyDimens.sosButtonSize,
+                decoration: BoxDecoration(
+                  color: MedBuddyColors.primary,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: MedBuddyColors.primary.withValues(alpha: 0.4),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.add,
+                    color: MedBuddyColors.pureWhite, size: 28),
+              ),
+            ),
+          ),
           Positioned(
             left: 0,
             right: 0,
@@ -98,17 +127,6 @@ class MedicationSchedule extends ConsumerWidget {
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: MedBuddyColors.primary,
-        foregroundColor: MedBuddyColors.pureWhite,
-        elevation: 2,
-        onPressed: () async {
-          await Navigator.of(context).pushNamed('/add-medication');
-          ref.read(medicationProvider.notifier).refresh();
-        },
-        tooltip: 'Add medication',
-        child: const Icon(Icons.add, size: 28),
       ),
     );
   }
