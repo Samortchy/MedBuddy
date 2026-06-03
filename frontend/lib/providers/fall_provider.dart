@@ -62,8 +62,6 @@ class FallNotifier extends StateNotifier<FallSession> {
     double? gpsLat,
     double? gpsLng,
   }) async {
-    // Avoid creating a second event if one is already active.
-    if (state.eventId != null) return;
     try {
       final res = await _dio.post('/emergency/trigger', data: {
         'event_type': eventType,

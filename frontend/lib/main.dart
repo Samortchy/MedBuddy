@@ -23,6 +23,7 @@ import 'screens/onboarding/s10_review.dart';
 // ── Auth guard ────────────────────────────────────────────────────────────────
 import 'providers/ai_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/fall_provider.dart';
 import 'providers/history_providers.dart';
 import 'providers/medication_provider.dart';
 import 'providers/patient_provider.dart';
@@ -148,11 +149,7 @@ class MedBuddyApp extends StatelessWidget {
         '/fall-agora': (_) => const FallAgoraScreen(),
         '/fall-resolved': (_) => const _PlaceholderScreen(
             label: 'Fall Resolved ✅', color: Color(0xFF16A34A)),
-        '/sos-confirmation': (context) => SOSConfirmationScreen(
-              onSOSConfirmed: () =>
-                  Navigator.of(context).pushReplacementNamed('/fall-agora'),
-              onCancelled: () => Navigator.of(context).pop(),
-            ),
+        '/sos-confirmation': (_) => const _SosConfirmationRoute(),
 
         // ── Caregiver home ─────────────────────────────────────────────
         '/caregiver-home': (_) => const CaregiverShell(),
@@ -708,6 +705,27 @@ class _CaregiverShellState extends State<CaregiverShell> {
               icon: Icon(Icons.settings), label: 'Settings'),
         ],
       ),
+    );
+  }
+}
+
+// ── SOS confirmation route (triggers a manual emergency) ─────────────────────
+
+class _SosConfirmationRoute extends ConsumerWidget {
+  const _SosConfirmationRoute();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SOSConfirmationScreen(
+      onSOSConfirmed: () async {
+        await ref
+            .read(fallProvider.notifier)
+            .triggerEmergency(eventType: 'manual_sos');
+        if (context.mounted) {
+          Navigator.of(context).pushReplacementNamed('/fall-agora');
+        }
+      },
+      onCancelled: () => Navigator.of(context).pop(),
     );
   }
 }
