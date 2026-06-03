@@ -44,7 +44,6 @@ import 'screens/patient/emergency/fall_verification_screen.dart';
 import 'screens/patient/emergency/fall_agora_screen.dart';
 
 // ── Patient: Check-in & AI ────────────────────────────────────────────────────
-import 'screens/patient/checkin/s17_ai_buddy_chat.dart';
 import 'screens/patient/checkin/s17b_wellness_checkin.dart';
 
 // ── Patient: History ─────────────────────────────────────────────────────────
@@ -67,8 +66,9 @@ import 'screens/patient/profile/edit/edit_checkin_prefs.dart';
 // ── Caregiver ─────────────────────────────────────────────────────────────────
 import 'screens/caregiver/c01_patient_list.dart';
 import 'screens/caregiver/c03_alerts_feed.dart';
-import 'screens/caregiver/c08_caregiver_chat.dart';
+import 'screens/caregiver/caregiver_messages.dart';
 import 'screens/caregiver/c11_settings.dart';
+import 'screens/patient/patient_chat_hub.dart';
 
 /// Global navigator key so push-notification handlers can navigate.
 final navigatorKey = GlobalKey<NavigatorState>();
@@ -162,7 +162,7 @@ class MedBuddyApp extends StatelessWidget {
         '/reminder-active': (_) => const ReminderActive(),
 
         // ── Patient Check-in & AI ──────────────────────────────────────
-        '/ai-chat': (_) => const _AIBuddyChatRoute(),
+        '/ai-chat': (_) => const PatientChatHub(),
         '/checkin': (_) => const _CheckInRoute(),
 
         // ── Patient History ────────────────────────────────────────────
@@ -317,6 +317,12 @@ class _MyProfileRoute extends ConsumerWidget {
         final response = await dio.post('/caregiver/invite');
         ref.invalidate(myCaregiversProvider);
         return response.data['code'] as String;
+      },
+      onLogout: () async {
+        await ref.read(authProvider.notifier).signOut();
+        if (context.mounted) {
+          Navigator.of(context).popUntil((r) => r.isFirst);
+        }
       },
       onRevokeCaregiver: (linkId) async {
         final dio = ref.read(apiServiceProvider);
@@ -482,9 +488,9 @@ class AuthGate extends ConsumerWidget {
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => const S01Welcome(),
+      error: (e, _) => const S03Login(startInLogin: true),
       data: (user) {
-        if (user == null) return const S01Welcome();
+        if (user == null) return const S03Login(startInLogin: true);
         // Register this device for push notifications (once per session).
         if (!_fcmRegistered) {
           _fcmRegistered = true;
@@ -681,7 +687,7 @@ class _CaregiverShellState extends State<CaregiverShell> {
   final List<Widget> _screens = [
     const C01PatientList(),
     const C03AlertsFeed(),
-    const C08CaregiverChat(),
+    const CaregiverMessagesScreen(),
     const C11Settings(),
   ];
 
@@ -731,19 +737,6 @@ class _SosConfirmationRoute extends ConsumerWidget {
 }
 
 // ── AI route wrappers (inject providers) ─────────────────────────────────────
-
-class _AIBuddyChatRoute extends ConsumerWidget {
-  const _AIBuddyChatRoute();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return AIBuddyChatScreen(
-      aiService: ref.read(aiServiceProvider),
-      sttService: ref.read(sttServiceProvider),
-      ttsService: ref.read(ttsServiceProvider),
-    );
-  }
-}
 
 class _CheckInRoute extends ConsumerWidget {
   const _CheckInRoute();

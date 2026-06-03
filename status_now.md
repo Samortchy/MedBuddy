@@ -24,6 +24,7 @@
 | Phase 3 | Emergency trigger + Agora (patient side) | ✅ Done — backend + fall/verify/Agora wiring; caregiver auto-join needs Phase 4 |
 | Phase 4a | Caregiver detail views (meds/wellness/emergencies/profile + last check-in) | ✅ Done |
 | Phase 4b | FCM push (token reg + emergency push + caregiver call join) | ✅ Done — run sql/08 + full rebuild |
+| Messaging | Real caregiver↔patient chat (uses existing caregiver_messages table) | ✅ Done — patient chat hub (AI + Caregiver tabs), caregiver Messages tab |
 | Phase 4 | Caregiver detail endpoints + FCM | ❌ Not started |
 | Phase 5 | AI visit summaries + symptom flagging | ❌ Not started |
 | Phase 6 | Rate limiting + production hardening | ❌ Not started |

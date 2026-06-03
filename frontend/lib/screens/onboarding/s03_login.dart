@@ -10,11 +10,13 @@ import '/providers/medication_provider.dart';
 import '/providers/onboarding_provider.dart';
 import '/providers/patient_provider.dart';
 import '/services/api_service.dart';
+import 's02_role_selection.dart';
 import 's04_basic_info.dart';
 
 class S03Login extends ConsumerStatefulWidget {
   final String role;
-  const S03Login({super.key, this.role = ''});
+  final bool startInLogin;
+  const S03Login({super.key, this.role = '', this.startInLogin = false});
 
   @override
   ConsumerState<S03Login> createState() => _S03LoginState();
@@ -28,6 +30,12 @@ class _S03LoginState extends ConsumerState<S03Login> {
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    isLogin = widget.startInLogin;
+  }
 
   @override
   void dispose() {
@@ -335,10 +343,22 @@ class _S03LoginState extends ConsumerState<S03Login> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () => setState(() {
-                            isLogin = !isLogin;
-                            _errorMessage = null;
-                          }),
+                          onTap: () {
+                            // Registering needs a role — send to role selection
+                            // if we don't have one yet (i.e. landed on login).
+                            if (isLogin && widget.role.isEmpty) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const S02RoleSelection()),
+                              );
+                              return;
+                            }
+                            setState(() {
+                              isLogin = !isLogin;
+                              _errorMessage = null;
+                            });
+                          },
                           child: Text(
                             isLogin ? 'Register' : 'Sign In',
                             style: MedBuddyTextStyles.secondary.copyWith(

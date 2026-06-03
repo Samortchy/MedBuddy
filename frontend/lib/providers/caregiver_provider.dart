@@ -9,21 +9,24 @@ class LinkedPatient {
   final String fullName;
   final String? lastCheckinAt;
   final String? profileId;
+  final String? linkId;
 
   const LinkedPatient({
     required this.id,
     required this.fullName,
     this.lastCheckinAt,
     this.profileId,
+    this.linkId,
   });
 
   factory LinkedPatient.fromJson(Map<String, dynamic> json) {
-    // Backend returns flat: patient_profile_id, full_name, phone, date_of_birth, linked_at
+    // Backend returns flat: link_id, patient_profile_id, full_name, phone, date_of_birth, linked_at
     return LinkedPatient(
       id: json['patient_profile_id'] as String? ?? json['id'] as String,
       fullName: json['full_name'] as String? ?? 'Patient',
       lastCheckinAt: json['last_checkin_at'] as String?,
       profileId: json['profile_id'] as String?,
+      linkId: json['link_id'] as String?,
     );
   }
 

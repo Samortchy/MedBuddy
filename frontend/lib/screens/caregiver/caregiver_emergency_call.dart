@@ -1,6 +1,7 @@
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '/constants/colors.dart';
@@ -24,7 +25,10 @@ class _CaregiverEmergencyCallScreenState
   bool _joined = false;
   bool _connected = false;
   bool _isMuted = false;
+  bool _ringing = false;
   String? _error;
+
+  final _ringtone = FlutterRingtonePlayer();
 
   // Non-zero uid so the caregiver doesn't collide with the patient (uid 0).
   final int _uid =
@@ -33,13 +37,37 @@ class _CaregiverEmergencyCallScreenState
   @override
   void initState() {
     super.initState();
+    _startRinging();
     WidgetsBinding.instance.addPostFrameCallback((_) => _join());
+  }
+
+  void _startRinging() {
+    if (_ringing) return;
+    _ringing = true;
+    try {
+      _ringtone.play(
+        android: AndroidSounds.ringtone,
+        ios: IosSounds.alarm,
+        looping: true,
+        volume: 1.0,
+        asAlarm: true,
+      );
+    } catch (_) {}
+  }
+
+  void _stopRinging() {
+    if (!_ringing) return;
+    _ringing = false;
+    try {
+      _ringtone.stop();
+    } catch (_) {}
   }
 
   Future<void> _join() async {
     try {
       final status = await Permission.microphone.request();
       if (!status.isGranted) {
+        _stopRinging();
         setState(() => _error = 'Microphone permission is required.');
         return;
       }
@@ -53,6 +81,7 @@ class _CaregiverEmergencyCallScreenState
       final appId = data['app_id'] as String?;
       final token = data['token'] as String?;
       if (appId == null || token == null) {
+        _stopRinging();
         setState(() => _error = 'Agora is not configured on the server.');
         return;
       }
@@ -65,6 +94,7 @@ class _CaregiverEmergencyCallScreenState
         RtcEngineEventHandler(
           onJoinChannelSuccess: (connection, elapsed) => _joined = true,
           onUserJoined: (connection, remoteUid, elapsed) {
+            _stopRinging();
             if (mounted) setState(() => _connected = true);
           },
           onUserOffline: (connection, remoteUid, reason) {
@@ -85,9 +115,11 @@ class _CaregiverEmergencyCallScreenState
         ),
       );
     } on DioException catch (e) {
+      _stopRinging();
       setState(() => _error =
           e.response?.data?['detail']?.toString() ?? 'Failed to connect.');
     } catch (e) {
+      _stopRinging();
       setState(() => _error = 'Failed to connect: $e');
     }
   }
@@ -98,6 +130,7 @@ class _CaregiverEmergencyCallScreenState
   }
 
   Future<void> _endCall() async {
+    _stopRinging();
     try {
       if (_joined) await _engine?.leaveChannel();
       await _engine?.release();
@@ -108,6 +141,7 @@ class _CaregiverEmergencyCallScreenState
 
   @override
   void dispose() {
+    _stopRinging();
     if (_engine != null) {
       _engine!.leaveChannel();
       _engine!.release();

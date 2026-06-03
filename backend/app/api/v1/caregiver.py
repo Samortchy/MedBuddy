@@ -2,6 +2,7 @@ import secrets
 import string
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
+from pydantic import BaseModel
 from datetime import datetime, timezone, timedelta
 
 from app.core.database import get_db
@@ -214,6 +215,7 @@ async def get_caregiver_patients(
         last_checkin_at = last.data[0]["completed_at"] if last.data else None
 
         patients.append({
+            "link_id": row["id"],
             "patient_profile_id": patient_id,
             "full_name": profile.get("full_name"),
             "phone": profile.get("phone"),
@@ -335,6 +337,95 @@ async def get_patient_emergencies_for_caregiver(
         .execute()
     )
     return result.data or []
+
+
+# ─── Caregiver ↔ patient messaging ────────────────────────────────────────────
+
+class MessageIn(BaseModel):
+    content: str
+
+
+def _get_link_or_403(db: Client, link_id: str, current_user: dict) -> dict:
+    """Fetch a link and verify the current user is its caregiver or patient."""
+    link = (
+        db.table("caregiver_patient_links")
+        .select("id, caregiver_id, patient_id, status")
+        .eq("id", link_id)
+        .single()
+        .execute()
+    )
+    if not link.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found.",
+        )
+    data = link.data
+    is_caregiver = str(data["caregiver_id"]) == str(current_user["profile_id"])
+    is_patient = (
+        current_user.get("patient_profile_id") is not None
+        and str(data["patient_id"]) == str(current_user["patient_profile_id"])
+    )
+    if not (is_caregiver or is_patient):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not part of this conversation.",
+        )
+    return data
+
+
+@router.get(
+    "/links/{link_id}/messages",
+    summary="Get the message thread for a caregiver↔patient link",
+)
+async def get_link_messages(
+    link_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    _get_link_or_403(db, link_id, current_user)
+    result = (
+        db.table("caregiver_messages")
+        .select("id, sender_id, content, voice_url, sent_at, read_at")
+        .eq("link_id", link_id)
+        .order("sent_at", desc=False)
+        .execute()
+    )
+    return result.data or []
+
+
+@router.post(
+    "/links/{link_id}/messages",
+    status_code=status.HTTP_201_CREATED,
+    summary="Send a message in a caregiver↔patient link",
+)
+async def send_link_message(
+    link_id: str,
+    payload: MessageIn,
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    _get_link_or_403(db, link_id, current_user)
+    content = payload.content.strip()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Message must not be empty.",
+        )
+    result = (
+        db.table("caregiver_messages")
+        .insert({
+            "link_id": link_id,
+            "sender_id": current_user["profile_id"],
+            "content": content,
+        })
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send message.",
+        )
+    return result.data[0]
 
 
 # ─── GET /caregiver/my-caregivers ─────────────────────────────────────────────

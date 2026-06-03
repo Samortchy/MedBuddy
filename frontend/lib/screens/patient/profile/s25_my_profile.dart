@@ -18,6 +18,7 @@ class MyProfileScreen extends StatelessWidget {
   final ValueChanged<String>? onEditSection;
   final Future<String> Function()? onGenerateInvite;
   final ValueChanged<String>? onRevokeCaregiver;
+  final VoidCallback? onLogout;
 
   const MyProfileScreen({
     super.key,
@@ -25,7 +26,53 @@ class MyProfileScreen extends StatelessWidget {
     this.onEditSection,
     this.onGenerateInvite,
     this.onRevokeCaregiver,
+    this.onLogout,
   });
+
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Log Out'),
+        content: const Text('Are you sure you want to log out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              onLogout?.call();
+            },
+            child: const Text('Log Out',
+                style: TextStyle(color: MedBuddyColors.emergency)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogoutButton(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _confirmLogout(context),
+        icon: const Icon(Icons.logout,
+            color: MedBuddyColors.emergency, size: 20),
+        label: Text('Log Out',
+            style: MedBuddyTextStyles.bodyBold
+                .copyWith(color: MedBuddyColors.emergency)),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: MedBuddyColors.emergency, width: 1.5),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(MedBuddyDimens.radiusLg),
+          ),
+        ),
+      ),
+    );
+  }
 
   void _handleGenerateInvite(BuildContext context) async {
     if (onGenerateInvite == null) {
@@ -186,6 +233,8 @@ class MyProfileScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: MedBuddyDimens.spacingMd),
                           _buildCaregiverSection(context, p),
+                          const SizedBox(height: MedBuddyDimens.spacingLg),
+                          _buildLogoutButton(context),
                         ],
                       ),
                     ),

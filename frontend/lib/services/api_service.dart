@@ -2,7 +2,15 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-const _baseUrl = 'http://10.0.2.2:8000/api/v1';
+// Backend base URL.
+//  - Android emulator (default): 10.0.2.2 routes to the host PC's localhost.
+//  - Real USB device with `adb reverse tcp:8000 tcp:8000`: pass
+//      --dart-define=API_BASE=http://127.0.0.1:8000/api/v1
+//  - LAN/other: pass the backend machine's IP, e.g. http://192.168.1.50:8000/api/v1
+const _baseUrl = String.fromEnvironment(
+  'API_BASE',
+  defaultValue: 'http://10.0.2.2:8000/api/v1',
+);
 
 Dio _buildDio() {
   final dio = Dio(

@@ -189,9 +189,9 @@ class _HomeState extends ConsumerState<Home> {
           const Spacer(),
           IconButton(
             onPressed: () => Navigator.of(context).pushNamed('/settings'),
-            icon: const Icon(Icons.notifications_outlined,
+            icon: const Icon(Icons.settings_outlined,
                 color: MedBuddyColors.slate500, size: 24),
-            tooltip: 'Notifications',
+            tooltip: 'Settings',
           ),
         ],
       ),
@@ -332,11 +332,11 @@ class _MedCard extends StatelessWidget {
   }
 
   String _formatTime(String raw) {
-    // "08:00:00" → "8:00 AM"
+    // scheduledTime is a full ISO datetime — format like the meds schedule tab.
     try {
-      final parts = raw.split(':');
-      int h = int.parse(parts[0]);
-      final m = parts[1];
+      final dt = DateTime.parse(raw).toUtc();
+      int h = dt.hour;
+      final m = dt.minute.toString().padLeft(2, '0');
       final suffix = h >= 12 ? 'PM' : 'AM';
       if (h > 12) h -= 12;
       if (h == 0) h = 12;
