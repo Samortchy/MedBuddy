@@ -1,24 +1,27 @@
 import 'dart:async';
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../constants/colors.dart';
 import '../../../constants/text_styles.dart';
+import '../../../providers/fall_provider.dart';
 import '../../../widgets/shared/alarm_indicator.dart';
 import 'fall_agora/widgets/connection_status_card.dart';
 import 'fall_agora/widgets/caregiver_avatar.dart';
 import 'fall_agora/widgets/fallback_status_card.dart';
 import 'fall_agora/widgets/sos_countdown_card.dart';
 
-// TODO: Replace with your Agora App ID when ready
-const _caregiverName = 'Sarah Johnson'; // Replace with dynamic caregiver name
+const _caregiverName = 'Your caregiver';
 
-class FallAgoraScreen extends StatefulWidget {
+class FallAgoraScreen extends ConsumerStatefulWidget {
   const FallAgoraScreen({super.key});
 
   @override
-  State<FallAgoraScreen> createState() => _FallAgoraScreenState();
+  ConsumerState<FallAgoraScreen> createState() => _FallAgoraScreenState();
 }
 
-class _FallAgoraScreenState extends State<FallAgoraScreen> {
+class _FallAgoraScreenState extends ConsumerState<FallAgoraScreen> {
   AgoraConnectionState _connectionState = AgoraConnectionState.connecting;
   bool _isMuted = false;
   bool _smsSent = false;
@@ -31,11 +34,71 @@ class _FallAgoraScreenState extends State<FallAgoraScreen> {
   Timer? _agoraTimer;
   Timer? _sosTimer;
 
+  RtcEngine? _engine;
+  bool _joined = false;
+
   @override
   void initState() {
     super.initState();
     _startAgoraTimeout();
     _startSosCountdown();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initAgora());
+  }
+
+  Future<void> _initAgora() async {
+    final session = ref.read(fallProvider);
+
+    // No Agora channel/token (e.g. Agora not configured) → go to fallback.
+    if (!session.hasAgora) {
+      _triggerFallback();
+      return;
+    }
+
+    try {
+      final status = await Permission.microphone.request();
+      if (!status.isGranted) {
+        _triggerFallback();
+        return;
+      }
+
+      final engine = createAgoraRtcEngine();
+      await engine.initialize(RtcEngineContext(appId: session.agoraAppId!));
+      _engine = engine;
+
+      engine.registerEventHandler(
+        RtcEngineEventHandler(
+          onJoinChannelSuccess: (connection, elapsed) {
+            _joined = true;
+          },
+          onUserJoined: (connection, remoteUid, elapsed) {
+            // Caregiver (or anyone) joined the channel → call is live.
+            if (!mounted) return;
+            setState(() => _connectionState = AgoraConnectionState.connected);
+            _agoraTimer?.cancel();
+          },
+          onUserOffline: (connection, remoteUid, reason) {
+            // Caregiver dropped — fall back to SMS/call escalation.
+            if (!mounted) return;
+            _triggerFallback();
+          },
+        ),
+      );
+
+      await engine.enableAudio();
+      await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
+      await engine.joinChannel(
+        token: session.agoraToken!,
+        channelId: session.agoraChannel!,
+        uid: 0,
+        options: const ChannelMediaOptions(
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Agora init/join failed: $e');
+      _triggerFallback();
+    }
   }
 
   void _startAgoraTimeout() {
@@ -47,13 +110,10 @@ class _FallAgoraScreenState extends State<FallAgoraScreen> {
       setState(() => _agoraSecondsLeft = (_agoraSecondsLeft - 1).clamp(0, 30));
       if (_agoraSecondsLeft == 0) {
         t.cancel();
-        _triggerFallback();
-      }
-    });
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted && _connectionState == AgoraConnectionState.connecting) {
-        setState(() => _connectionState = AgoraConnectionState.connected);
-        _agoraTimer?.cancel();
+        // No caregiver answered in time → escalate to fallback.
+        if (_connectionState != AgoraConnectionState.connected) {
+          _triggerFallback();
+        }
       }
     });
   }
@@ -89,15 +149,29 @@ class _FallAgoraScreenState extends State<FallAgoraScreen> {
     setState(() => _sosActivated = true);
   }
 
+  Future<void> _toggleMute() async {
+    setState(() => _isMuted = !_isMuted);
+    await _engine?.muteLocalAudioStream(_isMuted);
+  }
+
   void _cancelSOS() {
     _sosTimer?.cancel();
     Navigator.of(context).pushReplacementNamed('/fall-resolved');
+  }
+
+  Future<void> _leaveAgora() async {
+    try {
+      if (_joined) await _engine?.leaveChannel();
+      await _engine?.release();
+    } catch (_) {}
+    _engine = null;
   }
 
   @override
   void dispose() {
     _agoraTimer?.cancel();
     _sosTimer?.cancel();
+    _leaveAgora();
     super.dispose();
   }
 
@@ -136,10 +210,10 @@ class _FallAgoraScreenState extends State<FallAgoraScreen> {
                   state: _connectionState, caregiverName: _caregiverName),
               const SizedBox(height: 16),
 
-              // Alarm indicator
+              // Alarm indicator (mic mute toggle)
               AlarmIndicator(
                 isMuted: _isMuted,
-                onToggleMute: () => setState(() => _isMuted = !_isMuted),
+                onToggleMute: _toggleMute,
               ),
               const SizedBox(height: 16),
 

@@ -21,7 +21,9 @@
 | Bug batch C | AI patient-context injection in /chat | ✅ Done — needs backend restart |
 | Bug batch (bonus) | Deleted-med schedule filter + profile placeholder | ✅ Done |
 | Bug batch D | Caregiver list/revoke endpoints + wiring, placeholder removed | ✅ Done |
-| Phase 3 | Emergency trigger + Agora | ❌ Not started |
+| Phase 3 | Emergency trigger + Agora (patient side) | ✅ Done — backend + fall/verify/Agora wiring; caregiver auto-join needs Phase 4 |
+| Phase 4a | Caregiver detail views (meds/wellness/emergencies/profile + last check-in) | ✅ Done |
+| Phase 4b | FCM push (token reg + emergency push + caregiver call join) | ✅ Done — run sql/08 + full rebuild |
 | Phase 4 | Caregiver detail endpoints + FCM | ❌ Not started |
 | Phase 5 | AI visit summaries + symptom flagging | ❌ Not started |
 | Phase 6 | Rate limiting + production hardening | ❌ Not started |
@@ -79,16 +81,33 @@ Auth: All endpoints except `/health` require `Authorization: Bearer <supabase_ac
 | 42 | POST | `/api/v1/stt` | Any user | ✅ Code done — downloads model on first call |
 | 43 | POST | `/api/v1/tts` | Any user | ✅ Code done — downloads base model on first call |
 
-### Not yet implemented (Phase 3+):
+### Phase 3 endpoints (✅ implemented):
 
-| Endpoint | Needed By | Phase |
-|----------|-----------|-------|
-| `POST /api/v1/emergency/trigger` | SOS & fall detection | 3 |
-| `POST /api/v1/emergency/verify` | Liveness verification | 3 |
-| `POST /api/v1/agora/token` | Agora RTC channel | 3 |
-| `GET /api/v1/caregiver/patients/{id}/medications` | Caregiver detail view | 4 |
-| `GET /api/v1/caregiver/patients/{id}/wellness-checkins` | Caregiver detail view | 4 |
-| `POST /api/v1/notifications/fcm-token` | Push notifications | 4 |
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/v1/emergency/trigger` | Log fall/SOS event, return Agora channel + token |
+| `POST /api/v1/emergency/verify` | Liveness step; resolve (false alarm) or escalate |
+| `POST /api/v1/agora/token` | Mint 1-hour Agora RTC token |
+| `GET /api/v1/caregiver/my-caregivers` | Patient's linked caregivers (Phase D) |
+| `DELETE /api/v1/caregiver/links/{id}` | Patient revokes a caregiver (Phase D) |
+
+### Phase 4a endpoints (✅ implemented):
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/v1/caregiver/patients/{id}/profile` | Linked patient's profile (caregiver, link-checked) |
+| `GET /api/v1/caregiver/patients/{id}/medications` | Linked patient's active meds |
+| `GET /api/v1/caregiver/patients/{id}/wellness-checkins` | Linked patient's recent check-ins |
+| `GET /api/v1/caregiver/patients/{id}/emergency-events` | Linked patient's emergency events |
+
+### Phase 4b (✅ implemented):
+
+| Item | Purpose |
+|------|---------|
+| `POST /api/v1/patient/fcm-token` | Register a device's FCM token (patient or caregiver) |
+| `emergency/trigger` → `notify_caregivers` | Sends FCM push to linked caregivers' devices |
+| Flutter `fcm_service` + `caregiver_emergency_call` | Token registration; tap push → caregiver joins Agora call |
+| `backend/sql/08_fcm_tokens.sql` | `fcm_tokens` table (run in Supabase) |
 
 ---
 

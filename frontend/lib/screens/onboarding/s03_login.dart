@@ -4,7 +4,11 @@ import '/constants/colors.dart';
 import '/constants/dimens.dart';
 import '/constants/text_styles.dart';
 import '/providers/auth_provider.dart';
+import '/providers/caregiver_provider.dart';
+import '/providers/history_providers.dart';
+import '/providers/medication_provider.dart';
 import '/providers/onboarding_provider.dart';
+import '/providers/patient_provider.dart';
 import '/services/api_service.dart';
 import 's04_basic_info.dart';
 
@@ -70,6 +74,16 @@ class _S03LoginState extends ConsumerState<S03Login> {
     if (!mounted) return;
 
     ref.invalidate(onboardingProvider);
+
+    // Reset cached per-account data so the newly signed-in user loads fresh
+    // (these global providers otherwise keep the previous account's state,
+    // which can leave the next session stuck on a stale loading spinner).
+    ref.invalidate(caregiverPatientsProvider);
+    ref.invalidate(patientProfileProvider);
+    ref.invalidate(myCaregiversProvider);
+    ref.invalidate(medicationProvider);
+    ref.invalidate(healthConditionsProvider);
+    ref.invalidate(emergencyContactsProvider);
 
     final authState = ref.read(authProvider);
     authState.when(

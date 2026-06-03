@@ -1,8 +1,12 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // ── Constants ─────────────────────────────────────────────────────────────────
 import 'constants/colors.dart';
+import 'services/fcm_service.dart';
+import 'screens/caregiver/caregiver_emergency_call.dart';
 
 // ── Onboarding ────────────────────────────────────────────────────────────────
 import 'screens/onboarding/s01_welcome.dart';
@@ -65,12 +69,44 @@ import 'screens/caregiver/c03_alerts_feed.dart';
 import 'screens/caregiver/c08_caregiver_chat.dart';
 import 'screens/caregiver/c11_settings.dart';
 
+/// Global navigator key so push-notification handlers can navigate.
+final navigatorKey = GlobalKey<NavigatorState>();
+
+@pragma('vm:entry-point')
+Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
+  // Required to be registered; nothing to do in the background for now.
+}
+
+/// Opens the caregiver emergency call screen when an emergency push arrives.
+void _handleEmergencyMessage(RemoteMessage message) {
+  final data = message.data;
+  final channel = data['agora_channel'];
+  if (data['type'] == 'emergency' && channel != null && channel.isNotEmpty) {
+    navigatorKey.currentState?.push(MaterialPageRoute(
+      builder: (_) => CaregiverEmergencyCallScreen(channelName: channel),
+    ));
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(
     url: 'https://tcyrehuatbtlfvnttkgc.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjeXJlaHVhdGJ0bGZ2bnR0a2djIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1ODI3NzUsImV4cCI6MjA5MzE1ODc3NX0.MJsuJRl0GDqKo1a-eVBYNEjrD98DHG2g0F6Pcz5RkC8',
   );
+
+  // Firebase / FCM — don't let init failure crash the app.
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
+    FirebaseMessaging.onMessage.listen(_handleEmergencyMessage);
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleEmergencyMessage);
+    final initial = await FirebaseMessaging.instance.getInitialMessage();
+    if (initial != null) _handleEmergencyMessage(initial);
+  } catch (e) {
+    debugPrint('Firebase init failed: $e');
+  }
+
   runApp(const ProviderScope(child: MedBuddyApp()));
 }
 
@@ -81,6 +117,7 @@ class MedBuddyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'MedBuddy',
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -451,12 +488,21 @@ class AuthGate extends ConsumerWidget {
       error: (e, _) => const S01Welcome(),
       data: (user) {
         if (user == null) return const S01Welcome();
+        // Register this device for push notifications (once per session).
+        if (!_fcmRegistered) {
+          _fcmRegistered = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref.read(fcmServiceProvider).registerToken();
+          });
+        }
         if (user.role == 'caregiver') return const CaregiverShell();
         return const Home();
       },
     );
   }
 }
+
+bool _fcmRegistered = false;
 
 // ── App Launcher (role selection entry) ───────────────────────────────────────
 class AppLauncher extends StatelessWidget {

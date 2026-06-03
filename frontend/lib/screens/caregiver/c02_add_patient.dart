@@ -50,7 +50,7 @@ class _C02AddPatientState extends ConsumerState<C02AddPatient> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
@@ -131,10 +131,13 @@ class _C02AddPatientState extends ConsumerState<C02AddPatient> {
                         _error = null;
                       });
                       final nav = Navigator.of(context);
+                      final messenger = ScaffoldMessenger.of(context);
                       try {
                         await ref
                             .read(caregiverPatientsProvider.notifier)
                             .acceptInvite(code.join());
+                        messenger.showSnackBar(const SnackBar(
+                            content: Text('Patient linked successfully.')));
                         if (mounted) nav.pop();
                       } catch (e) {
                         setState(() {
@@ -158,7 +161,7 @@ class _C02AddPatientState extends ConsumerState<C02AddPatient> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2.5, color: Colors.white),
                     )
-                  : const Text('Send Request',
+                  : const Text('Link Patient',
                       style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -176,7 +179,7 @@ class _C02AddPatientState extends ConsumerState<C02AddPatient> {
 
             const SizedBox(height: 16),
             const Text(
-                'The patient must approve your request before linking is complete',
+                'You will be linked to the patient as soon as the code is verified.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: MedColors.slate500)),
           ],

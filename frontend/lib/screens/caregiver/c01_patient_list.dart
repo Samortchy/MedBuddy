@@ -4,7 +4,6 @@ import '/constants/colors.dart';
 import '/providers/caregiver_provider.dart';
 import 'c04_patient_dashboard.dart';
 import 'c02_add_patient.dart';
-import 'c10_pending_link_approval.dart';
 
 class C01PatientList extends ConsumerWidget {
   const C01PatientList({super.key});
@@ -23,13 +22,6 @@ class C01PatientList extends ConsumerWidget {
                 fontSize: 20,
                 fontWeight: FontWeight.bold)),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.pending_actions, color: Colors.white),
-            tooltip: 'Pending Approvals',
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(
-                    builder: (_) => const C10PendingLinkApproval())),
-          ),
           IconButton(
             icon: const Icon(Icons.person_add, color: Colors.white),
             onPressed: () => Navigator.push(context,

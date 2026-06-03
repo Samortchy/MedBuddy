@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../constants/colors.dart';
 import '../../../constants/text_styles.dart';
+import '../../../providers/fall_provider.dart';
 import 'fall_verification/widgets/waveform_animator.dart';
 import 'fall_verification/widgets/mic_indicator.dart';
 import 'fall_verification/widgets/verification_prompt.dart';
@@ -10,14 +12,16 @@ import '../../../widgets/shared/countdown_ring.dart';
 
 enum VerificationState { ttsPlaying, listening, matched, failed }
 
-class FallVerificationScreen extends StatefulWidget {
+class FallVerificationScreen extends ConsumerStatefulWidget {
   const FallVerificationScreen({super.key});
 
   @override
-  State<FallVerificationScreen> createState() => _FallVerificationScreenState();
+  ConsumerState<FallVerificationScreen> createState() =>
+      _FallVerificationScreenState();
 }
 
-class _FallVerificationScreenState extends State<FallVerificationScreen> {
+class _FallVerificationScreenState
+    extends ConsumerState<FallVerificationScreen> {
   final FocusNode _focusNode = FocusNode();
   final TextEditingController _textController = TextEditingController();
 
@@ -33,6 +37,22 @@ class _FallVerificationScreenState extends State<FallVerificationScreen> {
     super.initState();
     _focusNode.addListener(_onFocusChange);
     if (mounted) setState(() => _state = VerificationState.listening);
+    // Log the emergency event on the backend and fetch the Agora channel/token.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(fallProvider.notifier).triggerEmergency();
+    });
+  }
+
+  /// Patient confirmed they're okay → record + go to the resolved screen.
+  void _resolveOkay() {
+    ref.read(fallProvider.notifier).verifyLiveness(true, 'factor1');
+    Navigator.of(context).pushReplacementNamed('/fall-resolved');
+  }
+
+  /// No / failed response → record escalation + open the Agora call screen.
+  void _escalateToAgora() {
+    ref.read(fallProvider.notifier).verifyLiveness(false, 'factor2');
+    Navigator.of(context).pushReplacementNamed('/fall-agora');
   }
 
   void _onFocusChange() {
@@ -56,17 +76,17 @@ class _FallVerificationScreenState extends State<FallVerificationScreen> {
 
   // ignore: unused_element
   void _onManualOkay() {
-    Navigator.of(context).pushReplacementNamed('/fall-resolved');
+    _resolveOkay();
   }
 
   void _onFactorSuccess() {
     setState(() => _showFactorOverlay = false);
-    Navigator.of(context).pushReplacementNamed('/fall-resolved');
+    _resolveOkay();
   }
 
   void _onFactorFailed() {
     setState(() => _showFactorOverlay = false);
-    Navigator.of(context).pushReplacementNamed('/fall-agora');
+    _escalateToAgora();
   }
 
   @override
@@ -99,9 +119,7 @@ class _FallVerificationScreenState extends State<FallVerificationScreen> {
                     seconds: 30,
                     size: 60,
                     enableColorTween: false,
-                    onExpired: () {
-                      Navigator.of(context).pushReplacementNamed('/fall-agora');
-                    },
+                    onExpired: _escalateToAgora,
                   ),
                 ),
               ),
@@ -198,11 +216,11 @@ class _FallVerificationScreenState extends State<FallVerificationScreen> {
             ConfirmationOverlay(
               onContactEmergency: () {
                 setState(() => _showConfirmation = false);
-                Navigator.of(context).pushReplacementNamed('/fall-agora');
+                _escalateToAgora();
               },
               onCancel: () {
                 setState(() => _showConfirmation = false);
-                Navigator.of(context).pushReplacementNamed('/fall-resolved');
+                _resolveOkay();
               },
             ),
           if (_showFactorOverlay)
