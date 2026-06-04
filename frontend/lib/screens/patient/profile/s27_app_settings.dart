@@ -472,7 +472,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen> {
           await ref.read(authProvider.notifier).signOut();
           if (!mounted) return;
           Navigator.of(context)
-              .pushNamedAndRemoveUntil('/welcome', (_) => false);
+              .pushNamedAndRemoveUntil('/login', (_) => false);
         },
       ),
     ]);

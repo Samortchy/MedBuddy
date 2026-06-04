@@ -40,12 +40,19 @@ class _S02RoleSelectionState extends State<S02RoleSelection> {
             ),
 
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(MedBuddyDimens.spacingXl),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: MedBuddyDimens.spacingMd),
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints:
+                        BoxConstraints(minHeight: constraints.maxHeight),
+                    child: IntrinsicHeight(
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.all(MedBuddyDimens.spacingXl),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: MedBuddyDimens.spacingMd),
                     Text(
                       'Who are you?',
                       style: MedBuddyTextStyles.heading1.copyWith(
@@ -151,7 +158,11 @@ class _S02RoleSelectionState extends State<S02RoleSelection> {
                         ),
                       ),
                     ),
-                  ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),

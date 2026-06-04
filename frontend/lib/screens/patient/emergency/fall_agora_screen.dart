@@ -91,9 +91,10 @@ class _FallAgoraScreenState extends ConsumerState<FallAgoraScreen> {
           onJoinChannelSuccess: (connection, elapsed) {
             _joined = true;
             debugPrint('Agora: joined channel ${connection.channelId}');
-            // Speakerphone only routes once we're IN a channel — calling it
-            // before join returns -3 (ERR_NOT_READY) and throws. Do it here,
-            // and never let it abort the call.
+            // Make sure the mic is actually capturing and not muted, and route
+            // audio to the loudspeaker. All best-effort — never abort the call.
+            engine.enableLocalAudio(true).catchError((_) {});
+            engine.muteLocalAudioStream(false).catchError((_) {});
             engine.setEnableSpeakerphone(true).catchError((_) {});
           },
           onUserJoined: (connection, remoteUid, elapsed) {
@@ -125,8 +126,11 @@ class _FallAgoraScreenState extends ConsumerState<FallAgoraScreen> {
       );
 
       await engine.enableAudio();
-      // NOTE: setEnableSpeakerphone must be called AFTER joinChannel (see
-      // onJoinChannelSuccess) — before join it returns -3 and throws.
+      // setDefaultAudioRouteToSpeakerphone is the safe pre-join way to default
+      // to the loudspeaker (setEnableSpeakerphone returns -3 before join).
+      try {
+        await engine.setDefaultAudioRouteToSpeakerphone(true);
+      } catch (_) {}
       await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
       await engine.joinChannel(
         token: session.agoraToken!,
@@ -224,10 +228,16 @@ class _FallAgoraScreenState extends ConsumerState<FallAgoraScreen> {
     return Scaffold(
       backgroundColor: MedBuddyColors.emergency,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            children: [
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  child: Column(
+                    children: [
               // Header
               Text(
                 'EMERGENCY',
@@ -274,6 +284,10 @@ class _FallAgoraScreenState extends ConsumerState<FallAgoraScreen> {
                 onCancel: _cancelSOS,
               ),
             ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),

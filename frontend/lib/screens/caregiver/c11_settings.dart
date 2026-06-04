@@ -102,7 +102,7 @@ class _C11SettingsState extends ConsumerState<C11Settings> {
                 await ref.read(authProvider.notifier).signOut();
                 if (context.mounted) {
                   Navigator.of(context).pushNamedAndRemoveUntil(
-                    '/welcome',
+                    '/login',
                     (route) => false,
                   );
                 }

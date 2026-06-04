@@ -167,7 +167,7 @@ class MedBuddyApp extends StatelessWidget {
         // ── Onboarding ────────────────────────────────────────────────
         '/welcome': (_) => const S01Welcome(),
         '/role-select': (_) => const S02RoleSelection(),
-        '/login': (_) => const S03Login(),
+        '/login': (_) => const S03Login(startInLogin: true),
         '/profile/basic': (_) => const S04BasicInfo(),
         '/profile/conditions': (_) => const S05Conditions(),
         '/profile/mobility': (_) => const S06Mobility(),
@@ -356,7 +356,8 @@ class _MyProfileRoute extends ConsumerWidget {
       onLogout: () async {
         await ref.read(authProvider.notifier).signOut();
         if (context.mounted) {
-          Navigator.of(context).popUntil((r) => r.isFirst);
+          Navigator.of(context)
+              .pushNamedAndRemoveUntil('/login', (_) => false);
         }
       },
       onRevokeCaregiver: (linkId) async {
