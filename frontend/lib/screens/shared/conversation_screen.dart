@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
 import '../../constants/colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
@@ -34,7 +34,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   bool _sending = false;
 
   // Voice notes
-  final _recorder = AudioRecorder();
+  final _recorder = RecorderController();
   final _player = AudioPlayer();
   bool _recording = false;
   bool _uploadingVoice = false;
@@ -93,7 +93,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   Future<void> _startRecording() async {
     if (_recording || _uploadingVoice) return;
     try {
-      if (!await _recorder.hasPermission()) {
+      if (!await _recorder.checkPermission()) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text('Microphone permission is required.')));
@@ -103,10 +103,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       final dir = await getTemporaryDirectory();
       final path =
           '${dir.path}/vn_${DateTime.now().millisecondsSinceEpoch}.m4a';
-      await _recorder.start(
-        const RecordConfig(encoder: AudioEncoder.aacLc, numChannels: 1),
-        path: path,
-      );
+      // Defaults: AAC encoder in an mpeg4 (.m4a) container — playable by just_audio.
+      await _recorder.record(path: path);
       if (mounted) setState(() => _recording = true);
     } catch (e) {
       if (mounted) {
