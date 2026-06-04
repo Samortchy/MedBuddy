@@ -1,6 +1,7 @@
 import secrets
 import string
-from fastapi import APIRouter, Depends, HTTPException, status
+import uuid
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from supabase import Client
 from pydantic import BaseModel
 from datetime import datetime, timezone, timedelta
@@ -445,6 +446,68 @@ async def send_link_message(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send message.",
+        )
+    return result.data[0]
+
+
+_VOICE_BUCKET = "voice-notes"
+
+
+@router.post(
+    "/links/{link_id}/voice",
+    status_code=status.HTTP_201_CREATED,
+    summary="Send a voice note in a caregiver↔patient link",
+)
+async def send_voice_message(
+    link_id: str,
+    audio: UploadFile = File(..., description="Voice note (m4a/aac)"),
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """
+    Uploads a voice note to the public 'voice-notes' Supabase Storage bucket and
+    stores the resulting URL on the message. Requires a public bucket named
+    'voice-notes' to exist in Supabase Storage.
+    """
+    _get_link_or_403(db, link_id, current_user)
+
+    data = await audio.read()
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Voice note is empty.",
+        )
+
+    path = f"{link_id}/{uuid.uuid4().hex}.m4a"
+    content_type = audio.content_type or "audio/mp4"
+    try:
+        db.storage.from_(_VOICE_BUCKET).upload(
+            path,
+            data,
+            {"content-type": content_type, "upsert": "true"},
+        )
+    except Exception as e:  # bucket missing / storage error
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Voice upload failed (is the '{_VOICE_BUCKET}' bucket created?): {e}",
+        )
+
+    public_url = db.storage.from_(_VOICE_BUCKET).get_public_url(path)
+
+    result = (
+        db.table("caregiver_messages")
+        .insert({
+            "link_id": link_id,
+            "sender_id": current_user["profile_id"],
+            "content": "",
+            "voice_url": public_url,
+        })
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save voice message.",
         )
     return result.data[0]
 

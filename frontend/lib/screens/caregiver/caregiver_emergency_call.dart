@@ -25,6 +25,7 @@ class _CaregiverEmergencyCallScreenState
   bool _joined = false;
   bool _connected = false;
   bool _isMuted = false;
+  bool _speakerOn = true;
   bool _ringing = false;
   String? _error;
 
@@ -104,6 +105,8 @@ class _CaregiverEmergencyCallScreenState
       );
 
       await engine.enableAudio();
+      // Start hands-free so the caregiver can hear the patient immediately.
+      await engine.setEnableSpeakerphone(true);
       await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
       await engine.joinChannel(
         token: token,
@@ -127,6 +130,11 @@ class _CaregiverEmergencyCallScreenState
   Future<void> _toggleMute() async {
     setState(() => _isMuted = !_isMuted);
     await _engine?.muteLocalAudioStream(_isMuted);
+  }
+
+  Future<void> _toggleSpeaker() async {
+    setState(() => _speakerOn = !_speakerOn);
+    await _engine?.setEnableSpeakerphone(_speakerOn);
   }
 
   Future<void> _endCall() async {
@@ -204,6 +212,12 @@ class _CaregiverEmergencyCallScreenState
                     label: _isMuted ? 'Unmute' : 'Mute',
                     color: Colors.white,
                     onTap: _toggleMute,
+                  ),
+                  _CallButton(
+                    icon: _speakerOn ? Icons.volume_up : Icons.volume_off,
+                    label: _speakerOn ? 'Speaker' : 'Earpiece',
+                    color: _speakerOn ? Colors.white : Colors.white24,
+                    onTap: _toggleSpeaker,
                   ),
                   _CallButton(
                     icon: Icons.call_end,

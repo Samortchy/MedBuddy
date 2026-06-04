@@ -6,14 +6,18 @@ class LinkMessage {
   final String id;
   final String senderId;
   final String content;
+  final String? voiceUrl;
   final DateTime sentAt;
 
   const LinkMessage({
     required this.id,
     required this.senderId,
     required this.content,
+    this.voiceUrl,
     required this.sentAt,
   });
+
+  bool get isVoice => voiceUrl != null && voiceUrl!.isNotEmpty;
 
   factory LinkMessage.fromJson(Map<String, dynamic> json) {
     DateTime ts;
@@ -22,10 +26,12 @@ class LinkMessage {
     } catch (_) {
       ts = DateTime.now();
     }
+    final raw = json['voice_url'] as String?;
     return LinkMessage(
       id: json['id'] as String? ?? '',
       senderId: json['sender_id'] as String? ?? '',
       content: json['content'] as String? ?? '',
+      voiceUrl: (raw != null && raw.isNotEmpty) ? raw : null,
       sentAt: ts,
     );
   }

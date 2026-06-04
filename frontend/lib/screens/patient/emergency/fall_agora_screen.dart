@@ -85,6 +85,9 @@ class _FallAgoraScreenState extends ConsumerState<FallAgoraScreen> {
       );
 
       await engine.enableAudio();
+      // Hands-free by default — the patient may be on the floor, away from the
+      // phone, so route audio through the loudspeaker.
+      await engine.setEnableSpeakerphone(true);
       await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
       await engine.joinChannel(
         token: session.agoraToken!,
