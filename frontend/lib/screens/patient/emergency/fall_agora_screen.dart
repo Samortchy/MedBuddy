@@ -91,6 +91,10 @@ class _FallAgoraScreenState extends ConsumerState<FallAgoraScreen> {
           onJoinChannelSuccess: (connection, elapsed) {
             _joined = true;
             debugPrint('Agora: joined channel ${connection.channelId}');
+            // Speakerphone only routes once we're IN a channel — calling it
+            // before join returns -3 (ERR_NOT_READY) and throws. Do it here,
+            // and never let it abort the call.
+            engine.setEnableSpeakerphone(true).catchError((_) {});
           },
           onUserJoined: (connection, remoteUid, elapsed) {
             // Caregiver (or anyone) joined the channel → call is live.
@@ -121,9 +125,8 @@ class _FallAgoraScreenState extends ConsumerState<FallAgoraScreen> {
       );
 
       await engine.enableAudio();
-      // Hands-free by default — the patient may be on the floor, away from the
-      // phone, so route audio through the loudspeaker.
-      await engine.setEnableSpeakerphone(true);
+      // NOTE: setEnableSpeakerphone must be called AFTER joinChannel (see
+      // onJoinChannelSuccess) — before join it returns -3 and throws.
       await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
       await engine.joinChannel(
         token: session.agoraToken!,

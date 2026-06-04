@@ -96,6 +96,9 @@ class _CaregiverEmergencyCallScreenState
           onJoinChannelSuccess: (connection, elapsed) {
             _joined = true;
             debugPrint('Agora(caregiver): joined ${connection.channelId}');
+            // Speakerphone only routes once in a channel; before join it
+            // returns -3 and throws. Apply the current toggle state here.
+            engine.setEnableSpeakerphone(_speakerOn).catchError((_) {});
           },
           onUserJoined: (connection, remoteUid, elapsed) {
             debugPrint('Agora(caregiver): patient $remoteUid joined');
@@ -116,8 +119,8 @@ class _CaregiverEmergencyCallScreenState
       );
 
       await engine.enableAudio();
-      // Start hands-free so the caregiver can hear the patient immediately.
-      await engine.setEnableSpeakerphone(true);
+      // NOTE: setEnableSpeakerphone is applied in onJoinChannelSuccess — before
+      // joinChannel it returns -3 (ERR_NOT_READY) and throws, aborting the call.
       await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
       await engine.joinChannel(
         token: token,
