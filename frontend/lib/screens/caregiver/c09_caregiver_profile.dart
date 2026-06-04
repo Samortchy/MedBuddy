@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '/constants/colors.dart';
 import '/providers/auth_provider.dart';
 import '/providers/caregiver_provider.dart';
+import '/widgets/shared/profile_avatar.dart';
 import 'c02_add_patient.dart';
 
 class C09CaregiverProfile extends ConsumerWidget {
@@ -14,8 +15,6 @@ class C09CaregiverProfile extends ConsumerWidget {
     final patientsState = ref.watch(caregiverPatientsProvider);
 
     final email = user?.email ?? '';
-    final initial =
-        email.isNotEmpty ? email[0].toUpperCase() : 'C';
 
     return Scaffold(
       backgroundColor: MedColors.warmWhite,
@@ -40,15 +39,7 @@ class C09CaregiverProfile extends ConsumerWidget {
             ),
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: MedColors.primarySoft,
-                  child: Text(initial,
-                      style: const TextStyle(
-                          fontSize: 32,
-                          color: MedColors.primary,
-                          fontWeight: FontWeight.bold)),
-                ),
+                const ProfileAvatar(size: 84, background: MedColors.primarySoft),
                 const SizedBox(height: 12),
                 Text(email,
                     style: const TextStyle(

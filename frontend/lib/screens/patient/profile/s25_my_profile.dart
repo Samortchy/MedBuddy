@@ -5,6 +5,7 @@ import '../../../constants/text_styles.dart';
 import '../../../services/service_interfaces.dart';
 import '../../../widgets/shared/sos_button.dart';
 import '../../../widgets/shared/bottom_nav_bar.dart';
+import '../../../widgets/shared/profile_avatar.dart';
 
 /// S-25 — My Profile
 ///
@@ -304,17 +305,7 @@ class MyProfileScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Container(
-            width: MedBuddyDimens.avatarSizeLarge,
-            height: MedBuddyDimens.avatarSizeLarge,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: MedBuddyColors.pureWhite,
-              border: Border.all(color: MedBuddyColors.primaryLight, width: 3),
-            ),
-            child: const Icon(Icons.person_outline,
-                color: MedBuddyColors.primary, size: 40),
-          ),
+          const ProfileAvatar(size: MedBuddyDimens.avatarSizeLarge),
           const SizedBox(height: MedBuddyDimens.spacingMd),
           Text(p.fullName,
               style: MedBuddyTextStyles.heading1

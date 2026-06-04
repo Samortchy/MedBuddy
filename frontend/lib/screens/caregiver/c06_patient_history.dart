@@ -26,7 +26,7 @@ class _C06PatientHistoryState extends ConsumerState<C06PatientHistory>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -55,8 +55,11 @@ class _C06PatientHistoryState extends ConsumerState<C06PatientHistory>
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: const [
             Tab(text: 'Check-ins'),
+            Tab(text: 'Symptoms'),
             Tab(text: 'Medications'),
             Tab(text: 'Emergencies'),
           ],
@@ -66,6 +69,7 @@ class _C06PatientHistoryState extends ConsumerState<C06PatientHistory>
         controller: _tabController,
         children: [
           _CheckinsTab(patientId: widget.patientId),
+          _SymptomsTab(patientId: widget.patientId),
           _MedicationsTab(patientId: widget.patientId),
           _EmergenciesTab(patientId: widget.patientId),
         ],
@@ -180,6 +184,78 @@ class _CheckinsTab extends ConsumerWidget {
                     _StatChip(label: 'Energy', value: '${c.energy}/5'),
                   ],
                 ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+// ── Symptoms ──────────────────────────────────────────────────────────────────
+
+class _SymptomsTab extends ConsumerWidget {
+  final String patientId;
+  const _SymptomsTab({required this.patientId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(caregiverPatientSymptomsProvider(patientId));
+    return _asyncList<SymptomEntry>(
+      ref,
+      async,
+      caregiverPatientSymptomsProvider(patientId),
+      'No symptoms logged.',
+      (items) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: items.map((s) {
+          final flagged = s.severity == SymptomSeverity.flagged;
+          final watch = s.severity == SymptomSeverity.watch;
+          final badge = flagged ? 'Flagged' : (watch ? 'Watch' : null);
+          final badgeFg = flagged ? MedColors.emergency : MedColors.warning;
+          final badgeBg =
+              flagged ? MedColors.emergencyLight : MedColors.warningLight;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: flagged
+                      ? MedColors.warningMid
+                      : MedColors.slate300),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(_fmtDate(s.timestamp),
+                        style: const TextStyle(
+                            fontSize: 13, color: MedColors.slate500)),
+                    const Spacer(),
+                    if (badge != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: badgeBg,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(badge,
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: badgeFg,
+                                fontWeight: FontWeight.bold)),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(s.description,
+                    style: const TextStyle(
+                        fontSize: 14, color: MedColors.slate900)),
               ],
             ),
           );

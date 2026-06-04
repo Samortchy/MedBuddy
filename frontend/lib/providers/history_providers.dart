@@ -162,6 +162,18 @@ class SymptomLogNotifier extends StateNotifier<AsyncValue<List<SymptomEntry>>> {
     await _dio.post('/symptom-logs/', data: {'body': description, 'input_type': 'text'});
     await fetch();
   }
+
+  /// Optimistically removes the entry (so Dismissible is happy) then deletes
+  /// it on the backend. Used with swipe-to-dismiss + undo in the UI.
+  Future<void> delete(String id) async {
+    final current = state.valueOrNull ?? [];
+    state = AsyncValue.data(current.where((e) => e.id != id).toList());
+    try {
+      await _dio.delete('/symptom-logs/$id');
+    } catch (_) {
+      await fetch(); // restore real state on failure
+    }
+  }
 }
 
 final symptomLogProvider =

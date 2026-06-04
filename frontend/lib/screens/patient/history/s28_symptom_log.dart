@@ -11,6 +11,7 @@ import '../../../widgets/shared/bottom_nav_bar.dart';
 class SymptomLogScreen extends StatefulWidget {
   final List<SymptomEntry> entries;
   final Future<void> Function(String description)? onAddEntry;
+  final Future<void> Function(SymptomEntry entry)? onDeleteEntry;
   final VoidCallback? onVoiceRecord;
   final VoidCallback? onExport;
 
@@ -18,6 +19,7 @@ class SymptomLogScreen extends StatefulWidget {
     super.key,
     this.entries = const [],
     this.onAddEntry,
+    this.onDeleteEntry,
     this.onVoiceRecord,
     this.onExport,
   });
@@ -27,6 +29,32 @@ class SymptomLogScreen extends StatefulWidget {
 }
 
 class _SymptomLogScreenState extends State<SymptomLogScreen> {
+
+  void _dismissEntry(SymptomEntry entry) {
+    widget.onDeleteEntry?.call(entry);
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Text('Symptom deleted'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          margin: const EdgeInsets.only(
+            left: 16,
+            right: 16,
+            bottom: MedBuddyDimens.bottomNavHeight + 16,
+          ),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () {
+              messenger.hideCurrentSnackBar();
+              widget.onAddEntry?.call(entry.description);
+            },
+          ),
+        ),
+      );
+  }
 
   void _showAddEntrySheet() {
     final controller = TextEditingController();
@@ -252,7 +280,26 @@ class _SymptomLogScreenState extends State<SymptomLogScreen> {
               'description': entry.description,
               'severity': entry.severity,
             };
-            return _buildTimelineEntry(data, e.key == widget.entries.length - 1);
+            final tile =
+                _buildTimelineEntry(data, e.key == widget.entries.length - 1);
+            // Swipe left to delete, with an Undo action.
+            return Dismissible(
+              key: ValueKey(entry.id),
+              direction: DismissDirection.endToStart,
+              onDismissed: (_) => _dismissEntry(entry),
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20),
+                margin: const EdgeInsets.only(bottom: MedBuddyDimens.spacingLg),
+                decoration: BoxDecoration(
+                  color: MedBuddyColors.emergencyLight,
+                  borderRadius: BorderRadius.circular(MedBuddyDimens.radiusMd),
+                ),
+                child: const Icon(Icons.delete_outline,
+                    color: MedBuddyColors.emergency),
+              ),
+              child: tile,
+            );
           }).toList(),
         ),
       ],

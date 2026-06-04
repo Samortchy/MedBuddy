@@ -339,6 +339,27 @@ async def get_patient_emergencies_for_caregiver(
     return result.data or []
 
 
+@router.get(
+    "/patients/{patient_id}/symptom-logs",
+    summary="Get a linked patient's symptom logs (caregiver only)",
+)
+async def get_patient_symptoms_for_caregiver(
+    patient_id: str,
+    current_user: dict = Depends(get_current_caregiver),
+    db: Client = Depends(get_db),
+):
+    _verify_linked(db, current_user["profile_id"], patient_id)
+    result = (
+        db.table("symptom_logs")
+        .select("*")
+        .eq("patient_id", patient_id)
+        .order("logged_at", desc=True)
+        .limit(50)
+        .execute()
+    )
+    return result.data or []
+
+
 # ─── Caregiver ↔ patient messaging ────────────────────────────────────────────
 
 class MessageIn(BaseModel):

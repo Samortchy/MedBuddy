@@ -173,6 +173,40 @@ final caregiverPatientCheckinsProvider =
   }).toList();
 });
 
+SymptomSeverity _symptomSeverityFrom(String? s) {
+  switch (s) {
+    case 'flagged':
+      return SymptomSeverity.flagged;
+    case 'watch':
+      return SymptomSeverity.watch;
+    default:
+      return SymptomSeverity.normal;
+  }
+}
+
+/// A linked patient's symptom logs (most recent first).
+final caregiverPatientSymptomsProvider =
+    FutureProvider.family<List<SymptomEntry>, String>((ref, patientId) async {
+  final dio = ref.watch(apiServiceProvider);
+  final res = await dio.get('/caregiver/patients/$patientId/symptom-logs');
+  final list = res.data as List<dynamic>? ?? [];
+  return list.map((e) {
+    final m = e as Map<String, dynamic>;
+    DateTime ts;
+    try {
+      ts = DateTime.parse(m['logged_at'] as String).toLocal();
+    } catch (_) {
+      ts = DateTime.now();
+    }
+    return SymptomEntry(
+      id: m['id'] as String? ?? '',
+      description: m['body'] as String? ?? '',
+      timestamp: ts,
+      severity: _symptomSeverityFrom(m['ai_severity'] as String?),
+    );
+  }).toList();
+});
+
 /// A linked patient's emergency events (most recent first).
 final caregiverPatientEmergenciesProvider =
     FutureProvider.family<List<EmergencyEvent>, String>((ref, patientId) async {

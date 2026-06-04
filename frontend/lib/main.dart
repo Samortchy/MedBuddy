@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -91,6 +92,13 @@ void _handleEmergencyMessage(RemoteMessage message) {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Orientation handling: lock to portrait so layouts stay consistent.
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
   await Supabase.initialize(
     // Overridable via --dart-define=SUPABASE_URL=... / SUPABASE_ANON_KEY=...
     // (anon key is a public client key; safe to ship, but keep it configurable).
@@ -236,6 +244,8 @@ class _SymptomLogRoute extends ConsumerWidget {
       entries: state.valueOrNull ?? [],
       onAddEntry: (description) =>
           ref.read(symptomLogProvider.notifier).add(description),
+      onDeleteEntry: (entry) =>
+          ref.read(symptomLogProvider.notifier).delete(entry.id),
     );
   }
 }

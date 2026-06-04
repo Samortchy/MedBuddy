@@ -90,28 +90,32 @@ class _WellnessHistoryScreenState extends State<WellnessHistoryScreen> {
                     bottom: MedBuddyDimens.bottomNavHeight +
                         MedBuddyDimens.sosBottomOffset,
                   ),
-                  children: _filtered.isEmpty
-                      ? [_buildEmptyState()]
-                      : [
-                          _buildAIInsightCard(),
-                          const SizedBox(height: MedBuddyDimens.spacingMd),
-                          if (_moodData.length > 1)
-                            _buildChart('Mood', _moodData, 5,
-                                isAnomaly: false),
-                          if (_moodData.length > 1)
+                  children: [
+                    _buildHistoryLinks(),
+                    const SizedBox(height: MedBuddyDimens.spacingLg),
+                    ...(_filtered.isEmpty
+                        ? [_buildEmptyState()]
+                        : [
+                            _buildAIInsightCard(),
                             const SizedBox(height: MedBuddyDimens.spacingMd),
-                          if (_energyData.length > 1)
-                            _buildChart('Energy', _energyData, 5,
-                                isAnomaly: false),
-                          if (_energyData.length > 1)
-                            const SizedBox(height: MedBuddyDimens.spacingMd),
-                          if (_painData.length > 1)
-                            _buildChart('Pain Level', _painData, 10,
-                                isAnomaly: true),
-                          if (_painData.length > 1)
-                            const SizedBox(height: MedBuddyDimens.spacingMd),
-                          _buildCheckInList(),
-                        ],
+                            if (_moodData.length > 1)
+                              _buildChart('Mood', _moodData, 5,
+                                  isAnomaly: false),
+                            if (_moodData.length > 1)
+                              const SizedBox(height: MedBuddyDimens.spacingMd),
+                            if (_energyData.length > 1)
+                              _buildChart('Energy', _energyData, 5,
+                                  isAnomaly: false),
+                            if (_energyData.length > 1)
+                              const SizedBox(height: MedBuddyDimens.spacingMd),
+                            if (_painData.length > 1)
+                              _buildChart('Pain Level', _painData, 10,
+                                  isAnomaly: true),
+                            if (_painData.length > 1)
+                              const SizedBox(height: MedBuddyDimens.spacingMd),
+                            _buildCheckInList(),
+                          ]),
+                  ],
                 ),
               ),
               PatientBottomNavBar(
@@ -137,6 +141,50 @@ class _WellnessHistoryScreenState extends State<WellnessHistoryScreen> {
           const SOSButton(),
         ],
       ),
+    );
+  }
+
+  Widget _buildHistoryLinks() {
+    final items = <(String, IconData, String)>[
+      ('Symptom Log', Icons.note_alt_outlined, '/symptom-log'),
+      ('Medications', Icons.medication_outlined, '/med-adherence'),
+      ('Emergencies', Icons.warning_amber_outlined, '/emergency-log'),
+      ('Visit Summary', Icons.description_outlined, '/visit-summary'),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('MORE HISTORY', style: MedBuddyTextStyles.sectionHeader),
+        const SizedBox(height: MedBuddyDimens.spacingSm),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: items.map((it) {
+            return GestureDetector(
+              onTap: () => Navigator.of(context).pushNamed(it.$3),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: MedBuddyColors.primarySoft,
+                  borderRadius: BorderRadius.circular(MedBuddyDimens.radiusMd),
+                  border: Border.all(color: MedBuddyColors.primaryLight),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(it.$2, size: 16, color: MedBuddyColors.primary),
+                    const SizedBox(width: 6),
+                    Text(it.$1,
+                        style: MedBuddyTextStyles.label.copyWith(
+                            color: MedBuddyColors.primaryDark,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
