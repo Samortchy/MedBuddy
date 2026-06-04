@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../utils/nav_helpers.dart';
 import '../../../constants/colors.dart';
 import '../../../constants/dimens.dart';
 import '../../../constants/text_styles.dart';
@@ -193,7 +194,7 @@ class _VisitSummaryScreenState extends ConsumerState<VisitSummaryScreen> {
       child: Row(
         children: [
           IconButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => goBack(context, fallbackRoute: '/wellness-history'),
             icon: const Icon(Icons.arrow_back_ios,
                 color: MedBuddyColors.primary, size: 20),
           ),

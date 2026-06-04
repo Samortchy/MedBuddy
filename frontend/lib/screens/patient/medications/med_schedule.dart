@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/nav_helpers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../constants/colors.dart';
 import '../../../constants/dimens.dart';
@@ -228,7 +229,7 @@ class _AppBar extends StatelessWidget {
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.of(context).maybePop(),
+            onTap: () => goBack(context),
             child: const Icon(Icons.arrow_back_ios_new,
                 color: MedBuddyColors.primaryDark, size: 20),
           ),

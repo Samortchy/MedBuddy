@@ -93,13 +93,24 @@ class _CaregiverEmergencyCallScreenState
 
       engine.registerEventHandler(
         RtcEngineEventHandler(
-          onJoinChannelSuccess: (connection, elapsed) => _joined = true,
+          onJoinChannelSuccess: (connection, elapsed) {
+            _joined = true;
+            debugPrint('Agora(caregiver): joined ${connection.channelId}');
+          },
           onUserJoined: (connection, remoteUid, elapsed) {
+            debugPrint('Agora(caregiver): patient $remoteUid joined');
             _stopRinging();
             if (mounted) setState(() => _connected = true);
           },
           onUserOffline: (connection, remoteUid, reason) {
+            debugPrint('Agora(caregiver): patient $remoteUid offline ($reason)');
             if (mounted) setState(() => _connected = false);
+          },
+          onError: (err, msg) {
+            debugPrint('Agora(caregiver) ERROR: $err — $msg');
+          },
+          onConnectionStateChanged: (connection, state, reason) {
+            debugPrint('Agora(caregiver): state=$state reason=$reason');
           },
         ),
       );

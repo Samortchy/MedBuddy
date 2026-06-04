@@ -241,7 +241,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
               _inputBar(),
             ],
           ),
-          if (isPatient) const SOSButton(),
+          // Lift the SOS button above the chat input bar so it never covers
+          // the mic / send button. padding.bottom is 0 while the keyboard is up.
+          if (isPatient)
+            SOSButton(bottom: MediaQuery.of(context).padding.bottom + 76),
         ],
       ),
     );

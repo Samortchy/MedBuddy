@@ -46,10 +46,30 @@ class _FallAgoraScreenState extends ConsumerState<FallAgoraScreen> {
   }
 
   Future<void> _initAgora() async {
-    final session = ref.read(fallProvider);
+    // The verification screen fires triggerEmergency() WITHOUT awaiting it, so
+    // when we arrive here the session may not be populated yet. Wait briefly for
+    // an in-flight trigger; if the screen was opened directly (no emergency at
+    // all), start one now so we always have a live Agora channel.
+    var session = ref.read(fallProvider);
+    for (var i = 0;
+        i < 10 &&
+            !session.hasAgora &&
+            session.error == null &&
+            session.eventId == null;
+        i++) {
+      await Future.delayed(const Duration(milliseconds: 400));
+      session = ref.read(fallProvider);
+    }
+    if (!session.hasAgora && session.eventId == null) {
+      await ref
+          .read(fallProvider.notifier)
+          .triggerEmergency(eventType: 'manual_sos');
+      session = ref.read(fallProvider);
+    }
 
-    // No Agora channel/token (e.g. Agora not configured) → go to fallback.
+    // No Agora channel/token (Agora not configured, or trigger failed) → fallback.
     if (!session.hasAgora) {
+      debugPrint('Agora unavailable, falling back. error=${session.error}');
       _triggerFallback();
       return;
     }
@@ -57,6 +77,7 @@ class _FallAgoraScreenState extends ConsumerState<FallAgoraScreen> {
     try {
       final status = await Permission.microphone.request();
       if (!status.isGranted) {
+        debugPrint('Microphone permission denied → fallback');
         _triggerFallback();
         return;
       }
@@ -69,17 +90,32 @@ class _FallAgoraScreenState extends ConsumerState<FallAgoraScreen> {
         RtcEngineEventHandler(
           onJoinChannelSuccess: (connection, elapsed) {
             _joined = true;
+            debugPrint('Agora: joined channel ${connection.channelId}');
           },
           onUserJoined: (connection, remoteUid, elapsed) {
             // Caregiver (or anyone) joined the channel → call is live.
+            debugPrint('Agora: remote user $remoteUid joined');
             if (!mounted) return;
             setState(() => _connectionState = AgoraConnectionState.connected);
             _agoraTimer?.cancel();
           },
           onUserOffline: (connection, remoteUid, reason) {
-            // Caregiver dropped — fall back to SMS/call escalation.
+            // Only escalate if we were actually connected to a caregiver who
+            // then dropped — not on spurious early offline events.
+            debugPrint('Agora: remote user $remoteUid offline ($reason)');
             if (!mounted) return;
-            _triggerFallback();
+            if (_connectionState == AgoraConnectionState.connected) {
+              _triggerFallback();
+            }
+          },
+          onError: (err, msg) {
+            debugPrint('Agora ERROR: $err — $msg');
+          },
+          onConnectionStateChanged: (connection, state, reason) {
+            debugPrint('Agora: connection state=$state reason=$reason');
+          },
+          onTokenPrivilegeWillExpire: (connection, token) {
+            debugPrint('Agora: token about to expire');
           },
         ),
       );

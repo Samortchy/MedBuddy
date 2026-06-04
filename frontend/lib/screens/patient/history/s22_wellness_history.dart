@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/nav_helpers.dart';
 import '../../../constants/colors.dart';
 import '../../../constants/dimens.dart';
 import '../../../constants/text_styles.dart';
@@ -204,7 +205,7 @@ class _WellnessHistoryScreenState extends State<WellnessHistoryScreen> {
       child: Row(
         children: [
           IconButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => goBack(context),
             icon: const Icon(Icons.arrow_back_ios,
                 color: MedBuddyColors.primary, size: 20),
           ),

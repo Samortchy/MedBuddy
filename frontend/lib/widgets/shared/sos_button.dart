@@ -22,7 +22,12 @@ class SOSButton extends StatefulWidget {
   /// Wire this to EmergencyService.triggerSOS() when ready.
   final VoidCallback? onSOSConfirmed;
 
-  const SOSButton({super.key, this.onSOSConfirmed});
+  /// Distance from the bottom of the enclosing Stack. Defaults to
+  /// [MedBuddyDimens.sosBottomOffset]; override on screens with a bottom
+  /// input bar (e.g. chat) so the button clears it.
+  final double? bottom;
+
+  const SOSButton({super.key, this.onSOSConfirmed, this.bottom});
 
   @override
   State<SOSButton> createState() => _SOSButtonState();
@@ -58,7 +63,7 @@ class _SOSButtonState extends State<SOSButton>
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      bottom: MedBuddyDimens.sosBottomOffset,
+      bottom: widget.bottom ?? MedBuddyDimens.sosBottomOffset,
       right: MedBuddyDimens.spacingLg,
       child: ScaleTransition(
         scale: _pulseAnimation,

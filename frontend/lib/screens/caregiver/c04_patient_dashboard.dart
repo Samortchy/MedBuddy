@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '/utils/nav_helpers.dart';
 import '/constants/colors.dart';
 import '/providers/caregiver_provider.dart';
 import 'c05_patient_medications.dart';
@@ -39,7 +40,7 @@ class C04PatientDashboard extends ConsumerWidget {
         backgroundColor: MedColors.primaryDark,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.maybePop(context),
+          onPressed: () => goBack(context, fallbackRoute: '/caregiver-home'),
         ),
         title: Text(patientName,
             style: const TextStyle(

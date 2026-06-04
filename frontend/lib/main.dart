@@ -119,8 +119,14 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
     FirebaseMessaging.onMessage.listen(_handleEmergencyMessage);
     FirebaseMessaging.onMessageOpenedApp.listen(_handleEmergencyMessage);
+    // App opened from a terminated state by tapping the push. navigatorKey is
+    // not ready until the first frame, so defer until after runApp builds.
     final initial = await FirebaseMessaging.instance.getInitialMessage();
-    if (initial != null) _handleEmergencyMessage(initial);
+    if (initial != null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _handleEmergencyMessage(initial),
+      );
+    }
   } catch (e) {
     debugPrint('Firebase init failed: $e');
   }
